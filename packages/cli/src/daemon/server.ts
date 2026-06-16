@@ -3,10 +3,12 @@ import { Server as SocketIOServer, type Socket } from 'socket.io';
 import { createServer } from 'http';
 import { SessionManager } from './session.js';
 import { ClaudeAgent } from '../agents/claude.js';
+import { TTSManager } from './volcengine/ttsManager.js';
 import type {
   CreateSessionRequest,
   SendMessageRequest,
   SessionRequest,
+  SendVoiceReplyRequest,
   SessionCreatedResponse,
   SessionListResponse,
   SessionErrorResponse,
@@ -114,6 +116,65 @@ export async function startDaemon(port = DEFAULT_PORT) {
 
         // Send message
         await sessionManager.sendMessage(req.sessionId, req.message);
+        ack?.({ ok: true });
+      } catch (err: any) {
+        ack?.({ error: err.message });
+      }
+    });
+
+    socket.on('session:voice_reply', async (req: SendVoiceReplyRequest, ack) => {
+      log('session:voice_reply', req);
+      try {
+        const entry = sessionManager.getSession(req.sessionId);
+        if (!entry) {
+          ack?.({ error: `Session ${req.sessionId} not found` });
+          return;
+        }
+
+        const ttsManager = new TTSManager({
+          appkey: process.env.VOLCENGINE_API_KEY || '',
+          resourceId: 'seed-tts-2.0',
+          voiceType: 'saturn_zh_female_aojiaonvyou_tob',
+          onAudio: (frame: Buffer) => {
+            socket.emit('session:voice_audio', {
+              sessionId: req.sessionId,
+              data: frame.toString('base64'),
+            });
+          },
+          onComplete: () => {
+            socket.emit('session:voice_audio', { sessionId: req.sessionId, data: null });
+          },
+          onError: (err) => {
+            log('[TTS] error:', err);
+            socket.emit('session:voice_error', { sessionId: req.sessionId, error: err });
+          },
+        });
+
+        // Connect to TTS (async)
+        await ttsManager.connect();
+
+        // Pipe AI text_delta events into TTS
+        const handleEvent = (event: AgentEvent) => {
+          if (event.type === 'text_delta') {
+            ttsManager.feedText(event.data.text);
+          }
+          const response: SessionEventResponse = { sessionId: req.sessionId, event };
+          socket.emit('session:event', response);
+        };
+
+        sessionManager.setOnEvent(req.sessionId, handleEvent);
+        sessionManager.updateSessionStatus(req.sessionId, 'running');
+
+        // Start AI processing
+        sessionManager.sendMessage(req.sessionId, req.message).then(async () => {
+          // Wait for AI to finish, then close TTS
+          try {
+            await ttsManager.finish();
+          } catch (err) {
+            log('[TTS] finish error:', err);
+          }
+        });
+
         ack?.({ ok: true });
       } catch (err: any) {
         ack?.({ error: err.message });
