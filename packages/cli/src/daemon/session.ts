@@ -1,5 +1,5 @@
-import type { Session, AgentEvent } from '@uran/shared';
-import { generateSessionId } from '@uran/shared';
+import type { Session, AgentEvent } from '@openz/shared';
+import { generateSessionId } from '@openz/shared';
 import type { Agent, AgentSession } from '../agents/mod.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';

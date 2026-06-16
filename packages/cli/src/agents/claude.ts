@@ -1,6 +1,6 @@
 import { query, type Query, type SDKMessage, type SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { Agent, AgentSession } from './mod.js';
-import type { AgentEvent } from '@uran/shared';
+import type { AgentEvent } from '@openz/shared';
 
 interface ClaudeSession extends AgentSession {
   query: Query | null;

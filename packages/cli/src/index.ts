@@ -39,23 +39,27 @@ async function main() {
 
   if (!command || command === '--help' || command === '-h') {
     console.log(`
-Uran CLI v0.1.0
+Openz CLI v0.1.0
 
 Usage:
-  uran <command> [options]
+  openz <command> [options]
 
 Commands:
   daemon start [--port <port>]   Start the daemon (default port: ${DEFAULT_PORT})
+  daemon start [--server <url>] Start daemon and connect to relay server
   daemon stop                    Stop the daemon
   daemon status                  Check daemon status
   sessions list                  List all sessions
   sessions delete <id>           Delete a session
 
+Note: Use 'openz-server' to start the relay server.
+
 Examples:
-  uran daemon start
-  uran daemon start --port 19999
-  uran daemon status
-  uran sessions list
+  openz daemon start
+  openz daemon start --port 19999
+  openz daemon start --server ws://localhost:19998
+  openz daemon status
+  openz sessions list
     `.trim());
     process.exit(0);
   }
@@ -67,9 +71,11 @@ Examples:
       await stopDaemon();
       // Small delay to ensure port is freed
       await new Promise(r => setTimeout(r, 500));
-      const portArg = subArgs.find((arg, i) => arg === '--port' && subArgs[i + 1]);
-      const port = portArg ? parseInt(subArgs[subArgs.indexOf(portArg) + 1], 10) : DEFAULT_PORT;
-      await startDaemon(port);
+      const portArg = subArgs.findIndex((arg, i) => arg === '--port' && subArgs[i + 1]);
+      const serverArg = subArgs.findIndex((arg, i) => arg === '--server' && subArgs[i + 1]);
+      const port = portArg !== -1 ? parseInt(subArgs[portArg + 1], 10) : DEFAULT_PORT;
+      const serverUrl = serverArg !== -1 ? subArgs[serverArg + 1] : undefined;
+      await startDaemon(port, serverUrl);
     } else if (action === 'stop') {
       await stopDaemon();
     } else if (action === 'status') {
