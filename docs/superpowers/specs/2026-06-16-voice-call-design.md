@@ -170,57 +170,49 @@ packages/web/src/
 4. 清空 AI 回复文字
 5. 回到 RECORDING 状态
 
-### 3.4 火山引擎 SDK 接入
+### 3.4 火山引擎 TTS API 接入
 
-火山引擎提供浏览器端 WebSocket SDK，npm 包名：`@volcengine/veRTC-uniapp-wvp` 或直接使用原生 WebSocket。
+**认证**：Bearer Token 鉴权，仅需 Access Token（官方文档 2.1 章节）。
 
-**STT WebSocket（实时语音识别）：**
+**API 端点**：`https://openspeech.bytedance.com/api/v1/tts`
+
+**请求头**：
+```
+Content-Type: application/json
+Authorization: Bearer <access_token>
+```
+
+**请求体**：
 ```typescript
-// 伪代码示例
-const sttWs = new WebSocket('wss://openspeech.bytedance.com/...');
-
-sttWs.onopen = () => {
-  // 发送认证 token
-  sttWs.send(JSON.stringify({ app_id, token, ... }));
-};
-
-sttWs.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.result) {
-    onTextRecognized(data.result); // 触发识别文字回调
+{
+  app: {
+    token: "<access_token>",  // 仅需 token
+    cluster: "volcano_tts"
+  },
+  user: {
+    uid: "string"
+  },
+  audio: {
+    voice_type: "zh_female_qingxin",  // 默认女声，可切换
+    encoding: "ogg_opus",
+    rate: 24000,
+    speed_ratio: 1.0,
+    volume_ratio: 1.0,
+    pitch_ratio: 1.0,
+    emotion: "happy"  // 可选：情感控制
+  },
+  request: {
+    reqid: "unique_request_id",
+    text: "要合成的文本",
+    text_type: "plain",
+    operation: "submit"  // submit = 提交合成
   }
-};
-
-// 持续发送麦克风 PCM 数据
-microphoneStream.on('data', (chunk) => {
-  sttWs.send(chunk);
-});
+}
 ```
 
-**TTS WebSocket（流式语音合成）：**
-```typescript
-// 伪代码示例
-const ttsWs = new WebSocket('wss://openspeech.bytedance.com/...');
+**响应**：返回流式音频数据（ogg_opus 格式），前端通过 Web Audio API 实时播放。
 
-ttsWs.onopen = () => {
-  // 发送合成请求
-  ttsWs.send(JSON.stringify({
-    app_id, token, text: aiResponseText, voice: 'some_voice_id'
-  }));
-};
-
-ttsWs.onmessage = (event) => {
-  // event.data 是音频帧（Opus/PCM）
-  audioBuffer.push(event.data);
-  playAudio(event.data); // 实时播放
-};
-
-ttsWs.onclose = () => {
-  // 播完或被打断
-};
-```
-
-> 具体 API 格式以火山引擎官方文档为准，上述为示意。
+> 参考文档：https://www.volcengine.com/docs/6561/1329505
 
 ---
 
@@ -308,27 +300,41 @@ App 端实现相同的 `ISTTProvider` / `ITTSProvider` 接口，Openz Daemon 无
 
 ## 7. 实现计划
 
-### Phase 1: 基础整句模式
-1. 实现火山引擎 STT（整句识别，非实时）
-2. 实现火山引擎 TTS（流式）
-3. 改造 UI 添加语音通话面板
-4. 跑通：录音 → 识别 → 发送 → 等待 → 播放
+### Phase 1：TTS 语音回复（先做这个）
+> 用户通过文字发送消息，AI 回复以语音形式播报
+1. 实现火山引擎 TTS 接入（RESTful API / WebSocket）
+2. 新增 TTS 播放组件（Web Audio API）
+3. 改造 UI：在文字输入框旁添加"语音回复"开关或按钮
+4. 跑通：用户打字 → daemon AI 处理 → AI 文字回复 → TTS 流式合成 → 播放音频
+5. Daemon 改动：**零改动**，纯前端改动
 
-### Phase 2: 实时流式 + 打断
-5. STT 改为实时流式识别
-6. 实现打断控制器
-7. 实现完整状态机
+### Phase 2：STT 语音输入
+> 用户可以通过语音输入发送消息（按住说话，弹起发送）
+1. 实现火山引擎 STT 接入（WebSocket 流式识别）
+2. 新增麦克风录音组件（Web Audio API + MediaRecorder）
+3. 改造 UI：添加按住说话按钮
+4. 跑通：按住录音 → 实时识别文字 → 松开发送 → AI 文字回复 → TTS 播放
 
-### Phase 3: App 扩展（后续）
-8. App 端实现（复用同一套接口）
+### Phase 3：完整语音通话（双向可打断）
+> 建立通话长连接，用户可以随时说话，AI 随时回复，可打断
+1. STT + TTS 同时工作，双向流式
+2. 实现打断控制器（中断 TTS 播放 + 中止 daemon 生成）
+3. 实现完整状态机（IDLE → RECORDING → PROCESSING → SPEAKING）
+4. 优化实时性：边说边识别，边听边播放
+
+### Phase 4：App 扩展（后续）
+- App 端实现（复用同一套 Provider 接口）
 
 ---
 
-## 8. 待确认事项
+## 8. 已确认信息
 
-1. **火山引擎 App ID / Token**：需要你提供，或在控制台创建
-2. **TTS 音色选择**：用哪个音色（豆包默认音色 vs 其他）
-3. **是否需要声音克隆**：自定义音色需要额外配置
+| 项目 | 值 |
+|------|-----|
+| 火山引擎 Access Token | `d098393c-32be-4b38-9814-c85da94dc6c6` |
+| 鉴权方式 | Bearer Token（仅需 Token，无需 APP ID） |
+| TTS 默认音色 | `zh_female_qingxin`（女声） |
+| 音频格式 | `ogg_opus`，采样率 24000Hz |
 
 ---
 
