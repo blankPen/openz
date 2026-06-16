@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>火山引擎 TTS 流式播放 Demo</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 16px;
+        line-height: 1.6;
+      }
+      h1 { font-size: 20px; margin-bottom: 4px; }
+      .hint { color: #888; font-size: 13px; margin-bottom: 24px; }
+      textarea {
+        width: 100%; min-height: 100px; padding: 8px 10px;
+        font-size: 15px; font-family: inherit; border-radius: 6px;
+        border: 1px solid #ccc; box-sizing: border-box; resize: vertical;
+      }
+      .row { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+      button {
+        padding: 8px 16px; font-size: 15px; border: none; border-radius: 6px;
+        cursor: pointer; background: #2563eb; color: white;
+      }
+      button:disabled { background: #94a3b8; cursor: not-allowed; }
+      button.stop { background: #dc2626; }
+      #status { margin-top: 12px; font-size: 13px; color: #555; min-height: 1.4em; }
+      #status.error { color: #dc2626; }
+    </style>
+  </head>
+  <body>
+    <h1>火山引擎 TTS 流式播放 Demo</h1>
+    <p class="hint">
+      基于 <code>@openz/speech/client</code>(SDK 浏览器端),点击「播放」会向
+      <code>ws://&lt;host&gt;/api/tts/ws</code> 发起请求,服务端把火山引擎返回的
+      PCM 字节流边收边推给浏览器,SDK 用 PCMPlayer 边收边喂给 AudioContext 实时播放。
+    </p>
+
+    <label for="text">要合成的文本:</label>
+    <textarea id="text" placeholder="例如:今天天气不错,适合出门走走。">
+你好,我是火山引擎的语音合成服务。今天天气怎么样?我推荐你试试豆包语音合成模型 2.0,效果更自然。好的,那就这样,再见!</textarea>
+
+    <div class="row">
+      <button id="playBtn">▶ 播放</button>
+      <button id="stopBtn" class="stop" disabled>■ 停止</button>
+      <label class="hint" style="user-select: none; cursor: pointer;">
+        <input type="checkbox" id="simulateStream" />
+        模拟 LLM 逐步生成(段间 250~750ms 随机延迟)
+      </label>
+    </div>
+    <div id="status">就绪</div>
+    <pre id="log" style="margin-top:14px;padding:10px;background:#0b1020;color:#d1d5db;
+      font:12px/1.5 ui-monospace,Menlo,monospace;border-radius:6px;
+      max-height:240px;overflow:auto;white-space:pre-wrap;"></pre>
+
+    <script type="module">
+      import { PCMPlayer, TtsClient } from '/static/sdk-client.esm.js'
+
+      const $text = document.getElementById('text')
+      const $play = document.getElementById('playBtn')
+      const $stop = document.getElementById('stopBtn')
+      const $simulate = document.getElementById('simulateStream')
+      const $status = document.getElementById('status')
+      const $log = document.getElementById('log')
+
+      let pcmPlayer = null
+      let ttsClient = null
+      let sessionStart = 0
+      const t0 = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      const tStr = (t) => `+${(t / 1000).toFixed(2)}s`
+
+      function log(line) {
+        const ts = tStr(t0() - sessionStart)
+        $log.textContent += `[${ts}] ${line}\n`
+        $log.scrollTop = $log.scrollHeight
+      }
+
+      function setStatus(text, isError = false) {
+        $status.textContent = text
+        $status.classList.toggle('error', isError)
+      }
+
+      function setBusy(busy) {
+        $play.disabled = busy
+        $stop.disabled = !busy
+      }
+
+      let audioFrameCount = 0
+      let audioBytes = 0
+      let chunkCount = 0
+
+      function play() {
+        const text = $text.value.trim()
+        if (!text) {
+          setStatus('请输入要合成的文本', true)
+          return
+        }
+
+        setBusy(true)
+        sessionStart = t0()
+        audioFrameCount = 0
+        audioBytes = 0
+        chunkCount = 0
+        $log.textContent = ''
+        setStatus('连接中...')
+        log('点击播放,开始建连')
+
+        pcmPlayer = new PCMPlayer({
+          inputCodec: 'Int16',
+          channels: 1,
+          sampleRate: 24000,
+          flushTime: 200,
+        })
+        if (pcmPlayer.audioCtx.state === 'suspended') {
+          pcmPlayer.audioCtx.resume()
+        }
+
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+        ttsClient = new TtsClient({
+          url: `${proto}//${location.host}/api/tts/ws`,
+          text,
+          simulateStream: $simulate.checked ? true : false,
+          onSessionStart: (info) => {
+            log(`📡 session_start: sampleRate=${info.sampleRate} encoding=${info.encoding}`)
+            if (pcmPlayer && pcmPlayer.audioCtx.sampleRate !== info.sampleRate) {
+              pcmPlayer.destroy()
+              pcmPlayer = new PCMPlayer({
+                inputCodec: 'Int16',
+                channels: info.channels,
+                sampleRate: info.sampleRate,
+                flushTime: 200,
+              })
+            }
+          },
+          onChunk: (info) => {
+            chunkCount = info.index
+            log(`📝 收到第 ${info.index} 段文本 (${tStr(info.at)}): "${info.text.slice(0, 30)}${info.text.length > 30 ? '...' : ''}"`)
+          },
+          onFirstFrame: (at) => {
+            log(`⚡ first_frame ${tStr(at)} - 服务端推回首帧`)
+          },
+          onAudioFrame: (data) => {
+            audioFrameCount += 1
+            audioBytes += data.byteLength
+            if (pcmPlayer) pcmPlayer.feed(new Uint8Array(data))
+            if (audioFrameCount === 1) {
+              log(`🎵 第一个音频帧到达: ${data.byteLength} bytes,累计 ${(audioBytes/1024).toFixed(1)} KB`)
+            } else if (audioFrameCount % 10 === 0) {
+              log(`🎵 音频帧 #${audioFrameCount}: 累计 ${(audioBytes/1024).toFixed(1)} KB`)
+            }
+            setStatus(`合成中... 段 ${chunkCount}/音频帧 ${audioFrameCount}`)
+          },
+          onEnd: (info) => {
+            log(`✅ end: totalFrames=${info.totalFrames} totalBytes=${(info.totalBytes/1024).toFixed(1)} KB`)
+            setStatus('合成完成,等待播放结束')
+          },
+          onError: (msg) => {
+            log(`❌ error: ${msg}`)
+            setStatus('出错:' + msg, true)
+          },
+          onClose: () => {
+            log('🔌 ws closed')
+            setBusy(false)
+          },
+        })
+        ttsClient.start()
+      }
+
+      function stop() {
+        if (ttsClient) ttsClient.stop()
+        if (pcmPlayer) pcmPlayer.destroy()
+        pcmPlayer = null
+        ttsClient = null
+        setBusy(false)
+        setStatus('已停止')
+      }
+
+      $play.addEventListener('click', play)
+      $stop.addEventListener('click', stop)
+    </script>
+  </body>
+</html>
