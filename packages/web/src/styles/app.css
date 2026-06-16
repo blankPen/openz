@@ -387,6 +387,21 @@ body {
 .input-area__btn:hover { background: var(--accent-hover); }
 .input-area__btn:disabled { background: #374151; color: var(--text-muted); cursor: not-allowed; }
 
+.voice-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-left: 8px;
+  transition: background 150ms;
+}
+.voice-toggle-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ── Assistant avatar ── */
 
 .assistant-avatar {
