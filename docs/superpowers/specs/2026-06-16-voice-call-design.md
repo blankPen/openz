@@ -13,7 +13,7 @@
 - **STT（语音识别）**：火山引擎 ASR
 - **TTS（语音合成）**：火山引擎 TTS（豆包同款）
 - **AI 对话**：现有 Claude Agent SDK（daemon 现有能力）
-- **语音处理位置**：客户端（浏览器/App），不做中转
+- **语音处理位置**：TTS 放在 daemon 层（Node.js），客户端只接收音频流
 
 ---
 
@@ -30,30 +30,39 @@
 │  │ 音频流   │    │ (实时识别)   │    │                   │  │
 │  └──────────┘    └──────────┘    └────────┬───────────┘  │
 │                                              │             │
-│  ┌──────────┐    ┌──────────┐    ┌────────▼───────────┐  │
-│  │ 扬声器    │←───│ TTS WebSocket │←───│  AI 文字回复       │  │
-│  │ 音频播放  │    │ (流式合成)   │    │                   │  │
-│  └──────────┘    └──────────┘    └────────────────────┘  │
-│       ↑                                        │          │
-│       │           ┌──────────────────┐         │          │
-│       └───────────│ 打断控制器        │◀────────┘          │
-│                   │ (中止播放/请求)    │                    │
-│                   └──────────────────┘                    │
+│  ┌──────────┐    ┌──────────────────────────┐│             │
+│  │ 扬声器    │←───│ Socket.IO audio stream ││             │
+│  │ 音频播放  │    │ (daemon 推送音频帧)    ││             │
+│  └──────────┘    └──────────────────────────┘│             │
+│       ↑                                        │             │
+│       │           ┌──────────────────┐         │             │
+│       └───────────│ 打断控制器        │◀────────┘             │
+│                   │ (中止播放/请求)    │                      │
+│                   └──────────────────┘                      │
 └─────────────────────────────────────────────────────────┘
                               │
                               │ Socket.IO
                               ▼
 ┌─────────────────────────────────────────────────────────┐
-│                     Openz Daemon                         │
+│                     Openz Daemon                          │
 │                                                          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │              Claude Agent SDK                      │   │
-│  │  session:send → query() → AgentEvent stream      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                          │
-│  角色：纯 AI 处理，不感知语音存在                          │
+│  ┌──────────────────────┐  ┌──────────────────────────┐ │
+│  │  Claude Agent SDK     │  │  TTS Engine (Node.js ws)  │ │
+│  │  query() → text       │→ │  文字边收边合成 → 音频帧   │ │
+│  └──────────────────────┘  └──────────┬───────────────┘ │
+│                                         │                  │
+│  打断: session:interrupt → CancelSession(101)             │
 └─────────────────────────────────────────────────────────┘
+                              │
+                              │ 流式音频帧
+                              ▼
+                      客户端接收播放
 ```
+
+**为什么 TTS 放 daemon：**
+- 火山引擎 V3 WebSocket API 需要自定义 HTTP headers（`X-Api-Key`）
+- 浏览器原生 WebSocket 不支持自定义 headers
+- Node.js `ws` 库支持自定义 headers，所以 TTS 必须在 daemon（Node.js 进程）运行
 
 ### 2.2 火山引擎 WebSocket API
 
@@ -71,16 +80,18 @@
 
 ### 2.3 通信协议
 
-客户端新增 Socket.IO 事件：
+Socket.IO 新增事件：
 
 | 事件名 | 方向 | 说明 |
 |--------|------|------|
-| `session:send` | client → server | 发送文字消息（现有，不变） |
-| `session:event` | server → client | AI 事件流（现有，不变） |
-| `session:voice_start` | client → server | 开始语音通话（通知 daemon） |
-| `session:voice_stop` | client → server | 结束语音通话 |
+| `session:send` | client → server | 发送文字消息（现有） |
+| `session:event` | server → client | AI 事件流（现有） |
+| `session:interrupt` | client → server | 打断 AI 生成（现有） |
+| `session:voice_reply` | client → server | 请求 AI 回复以语音播报（TTS） |
+| `session:voice_audio` | server → client | 流式推送 TTS 音频帧（二进制） |
+| `session:voice_interrupt` | server → client | TTS 被打断通知（前端停止播放） |
 
-> **Daemon 完全不需要感知语音。** 客户端把语音识别后的文字通过 `session:send` 发给 daemon，收到 AI 文字回复后调 TTS 播放。Daemon 只需知道"这是一个语音 session"即可（用于统计/日志）。
+> **TTS 放在 daemon。** 客户端通过 `session:voice_reply` 请求语音回复，daemon 调火山引擎 TTS，将音频帧流式推送回客户端。客户端无需感知 TTS 存在，只需播放音频流。
 
 ---
 
@@ -90,13 +101,13 @@
 
 ```
 packages/web/src/
-├── components/
-│   └── VoiceCall/
-│       ├── VoiceCallPanel.tsx      # 语音通话 UI 面板
-│       ├── useVoiceCall.ts         # 语音通话核心 Hook
-│       ├── useVolcEngineSTT.ts     # 火山引擎 STT WebSocket
-│       └── useVolcEngineTTS.ts     # 火山引擎 TTS WebSocket
+├── hooks/
+│   └── useAudioPlayer.ts         # [新建] Web Audio API 音频播放器（接收音频帧播放）
+└── components/
+    └── ChatView.tsx                # [修改] 集成语音回复开关 + 音频播放
 ```
+
+> 注意：火山引擎 TTS 在 daemon 层（Node.js），前端只负责接收音频帧并播放，无需直接调用火山引擎 API。
 
 ### 3.2 核心状态机
 
@@ -304,18 +315,46 @@ Bytes 4-7: Event number (int32) 或 session_id length
 
 ## 4. Daemon 改动
 
-**改动最小化原则：Daemon 不感知语音协议。**
+### 4.1 新增文件
 
-### 4.1 新增事件
+```
+packages/cli/src/
+├── agents/
+│   └── volcengine/
+│       ├── bidirection.ts     # 从 resources/src 复制过来的 TTS 封装
+│       └── protocols.ts       # V3 二进制协议 marshal/unmarshal
+├── daemon/
+│   ├── tts.ts                # [新建] TTS 管理器：接收 AI text_delta 流式送入 TTS
+│   └── server.ts             # [修改] 新增 session:voice_reply 事件处理
+```
 
-| 事件 | 说明 |
-|------|------|
-| `session:voice_start` | 客户端告知开始语音 session（仅记录/日志） |
-| `session:voice_stop` | 客户端告知结束语音 session（仅记录/日志） |
+### 4.2 新增 Socket.IO 事件
 
-### 4.2 其他改动
+| 事件 | 方向 | 说明 |
+|------|------|------|
+| `session:voice_reply` | client → server | 请求语音回复（daemon 启动 TTS 流） |
+| `session:voice_audio` | server → client | TTS 音频帧流（二进制） |
+| `session:voice_interrupt` | server → client | TTS 被打断（前端停止播放） |
 
-- 无。`session:send` 和 `session:interrupt` 已有，无需改动。
+### 4.3 流式并行处理
+
+Daemon 收到 `session:send` 后，同时：
+1. 把 `text_delta` 事件实时转发给 TTS 引擎
+2. TTS 边收边合成，音频帧通过 `session:voice_audio` 推回前端
+
+```
+session:send
+    │
+    ├─ query() ──────────────────────────► AI stream (text_delta)
+    │                                              │
+    │                                    ┌─────────▼─────────┐
+    │                                    │  TTS Engine      │
+    │                                    │  边收text边合成   │
+    │                                    └─────────┬─────────┘
+    │                                    session:voice_audio
+    │                                              │
+    └──────────────────────────────────────────────┴─────► 前端播放
+```
 
 ---
 
@@ -388,11 +427,11 @@ App 端实现相同的 `ISTTProvider` / `ITTSProvider` 接口，Openz Daemon 无
 
 ### Phase 1：TTS 语音回复（先做这个）
 > 用户通过文字发送消息，AI 回复以语音形式播报
-1. 实现火山引擎 TTS 接入（RESTful API / WebSocket）
-2. 新增 TTS 播放组件（Web Audio API）
-3. 改造 UI：在文字输入框旁添加"语音回复"开关或按钮
-4. 跑通：用户打字 → daemon AI 处理 → AI 文字回复 → TTS 流式合成 → 播放音频
-5. Daemon 改动：**零改动**，纯前端改动
+1. **Daemon**：集成火山引擎 TTS（Node.js `ws` 库 + protocols.ts）
+2. **Daemon**：新增 `session:voice_reply` 事件，接收文字并流式推送音频
+3. **前端**：新增音频帧接收和 Web Audio API 播放
+4. **前端**：改造 UI，添加"语音回复"开关
+5. 跑通：用户打字 → daemon AI 处理 → AI text_delta 边吐边给 TTS → TTS 音频流式回推 → 前端实时播放
 
 ### Phase 2：STT 语音输入
 > 用户可以通过语音输入发送消息（按住说话，弹起发送）
@@ -417,15 +456,20 @@ App 端实现相同的 `ISTTProvider` / `ITTSProvider` 接口，Openz Daemon 无
 
 | 项目 | 值 |
 |------|-----|
-| 火山引擎 Access Token | `d098393c-32be-4b38-9814-c85da94dc6c6` |
-| 鉴权方式 | Bearer Token（仅需 Token，无需 APP ID） |
-| TTS 默认音色 | `zh_female_qingxin`（女声） |
-| 音频格式 | `ogg_opus`，采样率 24000Hz |
+| 火山引擎 API Key | `d098393c-32be-4b38-9814-c85da94dc6c6` |
+| 鉴权方式 | `X-Api-Key` + `X-Api-Resource-Id`（Node.js ws 库） |
+| TTS Resource ID | `seed-tts-2.0` |
+| TTS 实际可用音色 | `saturn_zh_female_aojiaonvyou_tob`（2.0 音色测试通过） |
+| 参考实现 | `resources/src/volcengine/bidirection.ts` + `resources/src/protocols.ts` |
+| 协议格式 | V3 WebSocket 二进制帧（4字节 header + payload） |
 
 ---
 
 ## 9. 参考资料
 
-- 火山引擎 TTS 文档：https://www.volcengine.com/docs/tts/1190783
+- 火山引擎 TTS 文档：https://www.volcengine.com/docs/6561/1329505
 - 火山引擎 ASR 文档：火山引擎控制台
+- **参考实现（已跑通）**：
+  - `resources/src/volcengine/bidirection.ts` — TTS 调用入口
+  - `resources/src/protocols.ts` — V3 二进制协议 marshal/unmarshal 完整实现
 - Openz Daemon Socket.IO 协议：见 `packages/cli/src/daemon/server.ts`
