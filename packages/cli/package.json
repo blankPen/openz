@@ -1,0 +1,29 @@
+{
+  "name": "@uran/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "uran": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts daemon restart",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.178",
+    "@uran/shared": "workspace:*",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,5 @@
+[     588ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:19999/socket.io/?EIO=4&transport=polling&t=PxBK60j:0
+[     597ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+[    1791ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:19999/socket.io/?EIO=4&transport=polling&t=PxBK6Jb:0
+[    3307ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:19999/socket.io/?EIO=4&transport=polling&t=PxBK6hJ:0
+[    7188ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:19999/socket.io/?EIO=4&transport=polling&t=PxBK7dw:0

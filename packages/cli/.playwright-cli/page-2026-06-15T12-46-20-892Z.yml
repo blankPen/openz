@@ -1,0 +1,48 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "Uran" [level=1] [ref=e3]
+    - generic [ref=e4]: Claude Code Remote Control
+    - generic [ref=e5]: Connected
+  - main [ref=e6]:
+    - complementary [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: Sessions
+        - button "+ New" [ref=e10] [cursor=pointer]
+      - generic [ref=e11]:
+        - generic [ref=e12] [cursor=pointer]:
+          - generic [ref=e13]:
+            - text: 53e271f7...
+            - generic [ref=e14]: idle
+          - generic [ref=e15]: claude
+          - generic [ref=e16]: /tmp
+        - generic [ref=e17] [cursor=pointer]:
+          - generic [ref=e18]:
+            - text: a2653989...
+            - generic [ref=e19]: idle
+          - generic [ref=e20]: claude
+          - generic [ref=e21]: /tmp
+        - generic [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]:
+            - text: 57dd7264...
+            - generic [ref=e24]: idle
+          - generic [ref=e25]: claude
+          - generic [ref=e26]: /tmp
+        - generic [ref=e27] [cursor=pointer]:
+          - generic [ref=e28]:
+            - text: 1a36b0ed...
+            - generic [ref=e29]: idle
+          - generic [ref=e30]: claude
+          - generic [ref=e31]: /tmp
+        - generic [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]:
+            - text: acd307f7...
+            - generic [ref=e34]: running
+          - generic [ref=e35]: claude
+          - generic [ref=e36]: /tmp
+    - generic [ref=e37]:
+      - generic [ref=e39]:
+        - generic [ref=e40]: 💬
+        - generic [ref=e41]: Select a session or create a new one
+      - generic [ref=e42]:
+        - textbox "Send a message to Claude..." [disabled] [ref=e43]
+        - button "Send" [disabled] [ref=e44]
