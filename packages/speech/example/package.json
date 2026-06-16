@@ -1,0 +1,23 @@
+{
+  "name": "@openz/speech-example",
+  "version": "0.1.0",
+  "description": "火山引擎 TTS SDK 的 example 服务(参考实现)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "start": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@openz/speech": "file:..",
+    "dotenv": "^17.2.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.13",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.22.4",
+    "typescript": "^5.8.3"
+  }
+}
