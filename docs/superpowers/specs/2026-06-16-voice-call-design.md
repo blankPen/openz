@@ -170,49 +170,135 @@ packages/web/src/
 4. 清空 AI 回复文字
 5. 回到 RECORDING 状态
 
-### 3.4 火山引擎 TTS API 接入
+### 3.4 火山引擎 TTS API 接入（V3 WebSocket 双向流式）
 
-**认证**：Bearer Token 鉴权，仅需 Access Token（官方文档 2.1 章节）。
+**接口**：WebSocket `wss://openspeech.bytedance.com/api/v3/tts/bidirection`
 
-**API 端点**：`https://openspeech.bytedance.com/api/v1/tts`
+#### 鉴权（Request Headers）
 
-**请求头**：
+| Key | 说明 | 必须 | 示例 |
+|-----|------|------|------|
+| `X-Api-Key` | 火山引擎控制台获取的 API Key | ✅ | `d098393c-32be-4b38-9814-c85da94dc6c6` |
+| `X-Api-Resource-Id` | 资源 ID，决定模型版本和计费方式 | ✅ | `seed-tts-2.0`（豆包语音合成 2.0） |
+| `X-Api-Connect-Id` | 连接追踪 ID，建议传递（每个 session 需唯一） | 可选 | `67ee89ba-7050-4c04-a3d7-ac61a63499b3` |
+
+> `X-Api-Resource-Id` 可选值：`seed-tts-2.0`（2.0字符版）、`seed-tts-1.0`（1.0字符版）、`seed-icl-2.0`（声音复刻2.0）等
+
+#### 二进制帧格式
+
+协议为 4 字节 header + payload（大端序）：
+
 ```
-Content-Type: application/json
-Authorization: Bearer <access_token>
+Byte 0: [Protocol version (4bit)][Header size (4bit)]  → 固定 0x11
+Byte 1: [Message type (8bit)][Flags (8bit)]
+Byte 2: [Serialization (4bit)][Compression (4bit)]      → JSON=0x10, Raw=0x00
+Byte 3: Reserved (0x00)
+Bytes 4-7: Event number (int32) 或 session_id length
+...
 ```
 
-**请求体**：
+#### 消息类型
+
+| Message type | 含义 | Flags |
+|---|---|---|
+| `0b0001` | Full-client request（上行） | `0b0100`（带 event number） |
+| `0b1001` | Full-server response（下行） | `0b0100`（带 event number） |
+| `0b1011` | Audio-only response | `0b0100` |
+| `0b1111` | Error information | 无 flags |
+
+#### Event 事件码
+
+| Event | 名称 | 方向 | 说明 |
+|-------|------|------|------|
+| 1 | StartConnection | 上行 | 建立 WebSocket 连接 |
+| 2 | FinishConnection | 上行 | 断开连接 |
+| 50 | ConnectionStarted | 下行 | 建连成功 |
+| 51 | ConnectionFailed | 下行 | 建连失败 |
+| 100 | StartSession | 上行 | 开始会话 |
+| 101 | CancelSession | 上行 | 取消会话（打断） |
+| 102 | FinishSession | 上行 | 结束会话 |
+| 150 | SessionStarted | 下行 | 会话开始成功 |
+| 151 | SessionCanceled | 下行 | 会话已取消 |
+| 152 | SessionFinished | 下行 | 会话结束 |
+| 153 | SessionFailed | 下行 | 会话失败 |
+| 200 | TaskRequest | 上行 | 发送合成文本 |
+| 350 | TTSSentenceStart | 下行 | 句子开始 |
+| 351 | TTSSentenceEnd | 下行 | 句子结束（含时间戳） |
+| 352 | TTSResponse | 下行 | 音频数据帧 |
+
+#### 完整交互流程
+
+```
+客户端                          服务端
+  │                                │
+  │  StartConnection (event=1)     │
+  │ ─────────────────────────────► │
+  │                                │
+  │       ConnectionStarted (50)    │
+  │ ◄───────────────────────────── │
+  │                                │
+  │  StartSession (event=100)       │
+  │  + session_id + tts_params     │
+  │ ─────────────────────────────► │
+  │                                │
+  │       SessionStarted (150)      │
+  │ ◄───────────────────────────── │
+  │                                │
+  │  TaskRequest (event=200)       │
+  │  + session_id + text           │
+  │ ─────────────────────────────► │
+  │                                │
+  │  TTSSentenceStart (350)        │
+  │ ◄───────────────────────────── │
+  │  TTSSentenceEnd (351)          │
+  │ ◄───────────────────────────── │
+  │  TTSResponse (352) + audio     │ ← 音频流（mp3/ogg_opus/pcm）
+  │ ◄───────────────────────────── │
+  │  (重复 350/351/352 直到文本结束)│
+  │                                │
+  │  FinishSession (event=102)     │
+  │ ─────────────────────────────► │
+  │                                │
+  │       SessionFinished (152)    │
+  │ ◄───────────────────────────── │
+  │                                │
+  │  FinishConnection (event=2)    │
+  │ ─────────────────────────────► │
+  │                                │
+  │       ConnectionFinished (52)  │
+  │ ◄───────────────────────────── │
+```
+
+#### TaskRequest 文本请求体
+
 ```typescript
 {
-  app: {
-    token: "<access_token>",  // 仅需 token
-    cluster: "volcano_tts"
-  },
-  user: {
-    uid: "string"
-  },
-  audio: {
-    voice_type: "zh_female_qingxin",  // 默认女声，可切换
-    encoding: "ogg_opus",
-    rate: 24000,
-    speed_ratio: 1.0,
-    volume_ratio: 1.0,
-    pitch_ratio: 1.0,
-    emotion: "happy"  // 可选：情感控制
-  },
-  request: {
-    reqid: "unique_request_id",
-    text: "要合成的文本",
-    text_type: "plain",
-    operation: "submit"  // submit = 提交合成
+  user: { uid: "user_123" },
+  event: 200,                    // TaskRequest 事件码
+  req_params: {
+    text: "你好，今天天气怎么样？",    // 待合成文本
+    speaker: "zh_female_qingxin",    // 音色（见音色列表）
+    audio_params: {
+      format: "mp3",                  // mp3 / ogg_opus / pcm
+      sample_rate: 24000,             // 采样率
+      speed_ratio: 0,                 // 语速 [-50, 100]
+      volume_ratio: 0,                // 音量 [-50, 100]
+      emotion: "",                    // 情感（如 "happy"）
+      emotion_scale: 4,                // 情绪强度 [1, 5]
+    },
+    model: "seed-tts-2.0-standard",  // 仅 2.0 有效：standard / expressive
   }
 }
 ```
 
-**响应**：返回流式音频数据（ogg_opus 格式），前端通过 Web Audio API 实时播放。
+#### 关键特性
 
-> 参考文档：https://www.volcengine.com/docs/6561/1329505
+- **流式输出**：边合成边返回音频，无需等待完整文本
+- **句子级时间戳**：开启 `enable_timestamp: true` 后，`TTSSentenceEnd` 事件含每字时间戳
+- **打断支持**：发送 `CancelSession (101)` 立即终止当前合成
+- **链接复用**：一次 WebSocket 连接可创建多个 session（但不支持并发）
+
+> 参考文档：https://www.volcengine.com/docs/6561/1329505（V3 WebSocket 双向流式）
 
 ---
 
