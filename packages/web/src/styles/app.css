@@ -404,6 +404,27 @@ body {
 
 /* ── Assistant avatar ── */
 
+.test-voice-btn {
+  margin-top: 12px;
+  background: #1a1a1a;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+.test-voice-btn:hover {
+  background: #252525;
+  border-color: var(--accent-light);
+}
+.test-voice-btn.playing {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
 .assistant-avatar {
   width: 24px;
   height: 24px;

@@ -1,7 +1,7 @@
-import { useRef, useState, useCallback, useEffect, type FormEvent } from 'react';
+import { useRef, useState, useCallback, type FormEvent } from 'react';
 import { socket } from '../socket';
 import { useSessionEvents } from '../hooks/useSocket';
-import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useTtsClient } from '../hooks/useTtsClient';
 import type { AgentEvent } from '../types';
 import { AgentMessage, ThinkingMessage, ToolUse, UserMessage } from './Message';
 
@@ -26,13 +26,13 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingToolId = useRef<string | null>(null);
   const currentMessageId = useRef<string | null>(null);
   const agentTextRef = useRef<Record<string, string>>({});
   const thinkingTextRef = useRef<Record<string, string>>({});
-  const { playChunk, stop: stopAudio } = useAudioPlayer();
+  const { connect: connectTts, disconnect: disconnectTts } = useTtsClient();
 
   const handleEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
@@ -150,24 +150,6 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
 
   useSessionEvents(sessionId, handleEvent, scrollRef);
 
-  // Listen for TTS audio frames from daemon
-  useEffect(() => {
-    const handler = (data: { sessionId: string; data: string | null; error?: string }) => {
-      if (data.sessionId !== sessionId) return;
-      if (data.error) {
-        console.error('[Voice] TTS error:', data.error);
-        return;
-      }
-      if (data.data === null) {
-        // End of audio stream
-      } else {
-        playChunk(data.data);
-      }
-    };
-    socket.on('session:voice_audio', handler);
-    return () => { socket.off('session:voice_audio', handler); };
-  }, [sessionId, playChunk]);
-
   const send = async (text: string) => {
     if (!text.trim() || sending) return;
     setSending(true);
@@ -187,10 +169,16 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
       m => m.type !== 'agent' && m.type !== 'thinking',
     ));
 
-    // Stop any playing audio
-    stopAudio();
+    // Stop any playing audio and disconnect existing TTS session
+    disconnectTts();
 
     const eventName = voiceReplyEnabled ? 'session:voice_reply' : 'session:send';
+
+    // For voice reply, establish WebSocket connection to daemon TTS endpoint first
+    // so PCM frames can arrive as soon as the daemon starts streaming
+    if (voiceReplyEnabled) {
+      connectTts(sessionId, text);
+    }
 
     return new Promise<void>((resolve) => {
       socket.emit(eventName, { sessionId, message: text }, (res: { error?: string }) => {

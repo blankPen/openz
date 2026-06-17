@@ -178,13 +178,8 @@ export class ClaudeAgent implements Agent {
         switch (msg.type) {
           case 'assistant':
             console.log(`[ClaudeAgent] msg[${msgCount}] assistant: ${JSON.stringify(msg.message.content?.[0])?.slice(0, 100)}`);
-            if (msg.message.content?.[0]?.type === 'text') {
-              this.emit(sessionId, {
-                type: 'text_delta',
-                sessionId,
-                data: { text: msg.message.content[0].text },
-              });
-            } else if (msg.message.content?.[0]?.type === 'tool_use') {
+            // text_delta is already emitted via stream_event (handleStreamEvent), do not emit again here
+            if (msg.message.content?.[0]?.type === 'tool_use') {
               // Handle tool_use content blocks in assistant messages
               const toolBlock = msg.message.content[0];
               const toolUseId = toolBlock.id || `tool-${Date.now()}`;

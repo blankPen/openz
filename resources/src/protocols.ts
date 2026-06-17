@@ -526,10 +526,8 @@ function readPayload(msg: Message, data: Uint8Array, offset: number): number {
   return offset
 }
 
-export const messageQueues = new Map<WebSocket, Message[]>()
-export const messageCallbacks = new Map<WebSocket, ((msg: Message) => void)[]>()
-// Pending awaitFirstAudio() resolvers in TTSManager — satisfied when the next audio frame arrives
-export const waitingAudioCallbacks = new Map<WebSocket, ((msg: Message) => void)[]>()
+const messageQueues = new Map<WebSocket, Message[]>()
+const messageCallbacks = new Map<WebSocket, ((msg: Message) => void)[]>()
 
 function setupMessageHandler(ws: WebSocket) {
   if (!messageQueues.has(ws)) {

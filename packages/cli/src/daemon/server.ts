@@ -1,9 +1,11 @@
+import 'dotenv/config';
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
 import { createServer } from 'http';
+import WebSocket, { WebSocketServer } from 'ws';
 import { SessionManager } from './session.js';
 import { ClaudeAgent } from '../agents/claude.js';
-import { TTSManager } from './volcengine/ttsManager.js';
+import { bidirectionTtsStream, DEFAULT_SAMPLE_RATE } from '@openz/speech/server';
 import type {
   CreateSessionRequest,
   SendMessageRequest,
@@ -38,10 +40,45 @@ function saveDaemonState(state: DaemonState) {
   writeFileSync(getDaemonStatePath(), JSON.stringify(state, null, 2));
 }
 
+// Active voice reply WebSocket connections, keyed by sessionId
+const voiceWsClients = new Map<string, WebSocket>();
+
 export async function startDaemon(port = DEFAULT_PORT) {
   const httpServer = createServer();
   const io = new SocketIOServer(httpServer, {
     cors: { origin: '*' },
+  });
+
+  // WebSocket server for TTS PCM streaming (used by @openz/speech/client)
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Handle WebSocket upgrade requests (TTS streaming)
+  wss.on('connection', (ws: WebSocket, sessionId: string) => {
+    log(`[WS] TTS client connected for session ${sessionId}`);
+    voiceWsClients.set(sessionId, ws);
+
+    ws.on('close', () => {
+      log(`[WS] TTS client disconnected for session ${sessionId}`);
+      voiceWsClients.delete(sessionId);
+    });
+
+    ws.on('error', (err) => {
+      log(`[WS] TTS client error for session ${sessionId}:`, err.message);
+      voiceWsClients.delete(sessionId);
+    });
+  });
+
+  // Attach WebSocket server to HTTP server upgrade handling
+  httpServer.on('upgrade', (request, socket, head) => {
+    const url = new URL(request.url || '', `http://${request.headers.host}`);
+    if (url.pathname === '/api/tts/ws') {
+      const sessionId = url.searchParams.get('sessionId') || '';
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, sessionId);
+      });
+    } else {
+      socket.destroy();
+    }
   });
 
   const agent = new ClaudeAgent();
@@ -122,6 +159,8 @@ export async function startDaemon(port = DEFAULT_PORT) {
       }
     });
 
+    // session:voice_reply — 使用 @openz/speech/server bidirectionTtsStream
+    // 音频通过 WebSocket 直发，text_delta 通过 Socket.IO 事件继续上报
     socket.on('session:voice_reply', async (req: SendVoiceReplyRequest, ack) => {
       log('session:voice_reply', req);
       try {
@@ -131,49 +170,135 @@ export async function startDaemon(port = DEFAULT_PORT) {
           return;
         }
 
-        const ttsManager = new TTSManager({
-          appkey: process.env.VOLCENGINE_API_KEY || '',
-          resourceId: 'seed-tts-2.0',
-          voiceType: 'saturn_zh_female_aojiaonvyou_tob',
-          onAudio: (frame: Buffer) => {
-            socket.emit('session:voice_audio', {
-              sessionId: req.sessionId,
-              data: frame.toString('base64'),
-            });
-          },
-          onComplete: () => {
-            socket.emit('session:voice_audio', { sessionId: req.sessionId, data: null });
-          },
-          onError: (err) => {
-            log('[TTS] error:', err);
-            socket.emit('session:voice_error', { sessionId: req.sessionId, error: err });
-          },
-        });
+        const sessionId = req.sessionId;
+        const ws = voiceWsClients.get(sessionId);
 
-        // Connect to TTS (async)
-        await ttsManager.connect();
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          ack?.({ error: `No TTS WebSocket connection for session ${sessionId}` });
+          return;
+        }
 
-        // Pipe AI text_delta events into TTS
+        // ws is guaranteed non-null here; capture in const for closure safety
+        const wsClient = ws;
+
+        // --- 流式并发: AI text_delta 事件实时推入 TTS ---
+        const textQueue: string[] = [];
+        let resolveNextChunk: ((chunk: string) => void) | null = null;
+        let ttsDone = false;
+
+        // 异步生成器: bidirectionTtsStream 的 texts 参数
+        // 每次 yield 都会等待 resolveNextChunk 被调用，即等待下一个 text_delta 句子
+        async function* textStream(): AsyncGenerator<string> {
+          while (!ttsDone || textQueue.length > 0) {
+            if (textQueue.length > 0) {
+              yield textQueue.shift()!;
+            } else {
+              // 等待下一个 text_delta 句子到来
+              await new Promise<string>((resolve) => {
+                resolveNextChunk = resolve;
+              });
+              if (textQueue.length > 0) {
+                yield textQueue.shift()!;
+              }
+            }
+          }
+        }
+
+        // 把 text_delta 句子推入队列
         const handleEvent = (event: AgentEvent) => {
           if (event.type === 'text_delta') {
-            ttsManager.feedText(event.data.text);
+            // 按句子标点切分，实时推入 TTS
+            const text = event.data.text;
+            const sentences = text.match(/[^.。!！?？\n]+[.。!！?？\n]*/g);
+            if (sentences) {
+              for (const sentence of sentences) {
+                const trimmed = sentence.trim();
+                if (!trimmed) continue;
+                if (resolveNextChunk) {
+                  resolveNextChunk(trimmed);
+                  resolveNextChunk = null;
+                } else {
+                  textQueue.push(trimmed);
+                }
+              }
+            }
           }
-          const response: SessionEventResponse = { sessionId: req.sessionId, event };
+
+          if (event.type === 'turn_done' || event.type === 'assistant_complete') {
+            ttsDone = true;
+            // 剩余文本
+            const remaining = textQueue.shift();
+            if (remaining && resolveNextChunk) {
+              resolveNextChunk(remaining);
+              resolveNextChunk = null;
+            }
+          }
+
+          // 继续转发 text_delta 事件给 Socket.IO 客户端
+          const response: SessionEventResponse = { sessionId, event };
           socket.emit('session:event', response);
         };
 
-        sessionManager.setOnEvent(req.sessionId, handleEvent);
-        sessionManager.updateSessionStatus(req.sessionId, 'running');
+        sessionManager.setOnEvent(sessionId, handleEvent);
+        sessionManager.updateSessionStatus(sessionId, 'running');
 
-        // Start AI processing
-        sessionManager.sendMessage(req.sessionId, req.message).then(async () => {
-          // Wait for AI to finish, then close TTS
+        const startedAt = Date.now();
+
+        // 使用 bidirectionTtsStream 流式合成
+        async function runTtsStream() {
           try {
-            await ttsManager.finish();
+            const stream = bidirectionTtsStream({
+              appkey: process.env.VOLCENGINE_API_KEY || '',
+              resourceId: 'seed-tts-2.0',
+              voiceType: 'saturn_zh_female_aojiaonvyou_tob',
+              texts: textStream(),
+              encoding: 'pcm',
+              sampleRate: DEFAULT_SAMPLE_RATE,
+              onAudioFrame: (frame) => {
+                if (wsClient.readyState === WebSocket.OPEN) {
+                  wsClient.send(frame);
+                }
+              },
+              onFirstFrame: (at) => {
+                log(`[TTS] first frame +${at}ms for session ${sessionId}`);
+                if (wsClient.readyState === WebSocket.OPEN) {
+                  wsClient.send(JSON.stringify({ type: 'first_frame', at }));
+                }
+              },
+              onChunk: (idx, text) => {
+                log(`[TTS] chunk #${idx}: "${text.slice(0, 20)}..."`);
+                if (wsClient.readyState === WebSocket.OPEN) {
+                  wsClient.send(JSON.stringify({ type: 'chunk', index: idx, text, at: Date.now() - startedAt }));
+                }
+              },
+            });
+
+            // Drain the stream
+            await new Promise<void>((resolve, reject) => {
+              stream.on('end', resolve);
+              stream.on('error', reject);
+            });
+
+            if (wsClient.readyState === WebSocket.OPEN) {
+              wsClient.send(JSON.stringify({ type: 'end', totalBytes: 0 }));
+              wsClient.close();
+            }
           } catch (err) {
-            log('[TTS] finish error:', err);
+            log('[TTS] stream error:', err);
+            if (wsClient.readyState === WebSocket.OPEN) {
+              wsClient.send(JSON.stringify({ type: 'error', error: String(err) }));
+              wsClient.close();
+            }
           }
+        }
+
+        // 启动 AI 处理（非阻塞）
+        sessionManager.sendMessage(sessionId, req.message).catch((err) => {
+          log('[TTS] sendMessage error:', err);
         });
+
+        // 启动 TTS 流（并行）
+        runTtsStream();
 
         ack?.({ ok: true });
       } catch (err: any) {
@@ -211,12 +336,14 @@ export async function startDaemon(port = DEFAULT_PORT) {
 
   httpServer.listen(port, () => {
     console.log(`Uran daemon listening on http://localhost:${port}`);
+    console.log(`TTS WebSocket endpoint: ws://localhost:${port}/api/tts/ws?sessionId=<sessionId>`);
   });
 
   // 优雅退出
   process.on('SIGINT', () => {
     console.log('\nShutting down...');
     io.close();
+    wss.close();
     httpServer.close();
     process.exit(0);
   });

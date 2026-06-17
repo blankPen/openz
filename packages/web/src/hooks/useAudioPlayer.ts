@@ -5,7 +5,6 @@ export function useAudioPlayer() {
   const audioQueueRef = useRef<AudioBuffer[]>([]);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isPlayingRef = useRef(false);
-  const onFinishRef = useRef<(() => void) | null>(null);
 
   const init = useCallback(async () => {
     if (!audioContextRef.current) {

@@ -1,77 +1,85 @@
-import { describe, it, expect, afterAll } from 'vitest';
-import { TTSManager } from './ttsManager.js';
+import { describe, it, expect } from 'vitest';
+import { bidirectionTtsStream, DEFAULT_SAMPLE_RATE } from '@openz/speech/server';
 
 const API_KEY = process.env.VOLCENGINE_API_KEY || 'd098393c-32be-4b38-9814-c85da94dc6c6';
 
-describe('TTSManager (real Volcengine API)', () => {
-  afterAll(() => {
-    // cleanup
-  });
-
-  it('connects to real Volcengine TTS and receives audio', async () => {
+describe('bidirectionTtsStream (real Volcengine API)', () => {
+  it('streams audio frames from real Volcengine TTS', async () => {
     const audioFrames: Buffer[] = [];
 
-    const manager = new TTSManager({
+    const stream = bidirectionTtsStream({
       appkey: API_KEY,
       resourceId: 'seed-tts-2.0',
       voiceType: 'saturn_zh_female_aojiaonvyou_tob',
-      onAudio: (frame: Buffer) => {
+      texts: ['你好，测试流式合成。'],
+      encoding: 'pcm',
+      sampleRate: DEFAULT_SAMPLE_RATE,
+      onAudioFrame: (frame: Buffer) => {
         audioFrames.push(frame);
-      },
-      onComplete: () => {},
-      onError: (err: string) => {
-        console.error('TTS error:', err);
       },
     });
 
-    await manager.connect();
-    expect(manager.isConnected()).toBe(true);
-
-    manager.feedText('你好');
-    await manager.finish();
+    await new Promise<void>((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
 
     expect(audioFrames.length).toBeGreaterThan(0);
-    manager.destroy();
   }, 30000);
 
-  it('feeds multiple text chunks', async () => {
+  it('streams multiple text chunks', async () => {
     const audioFrames: Buffer[] = [];
+    const chunks: { index: number; text: string; at: number }[] = [];
 
-    const manager = new TTSManager({
+    async function* textChunks() {
+      yield '第一句文本。';
+      yield '第二句文本。';
+    }
+
+    const stream = bidirectionTtsStream({
       appkey: API_KEY,
       resourceId: 'seed-tts-2.0',
       voiceType: 'saturn_zh_female_aojiaonvyou_tob',
-      onAudio: (frame: Buffer) => {
+      texts: textChunks(),
+      encoding: 'pcm',
+      sampleRate: DEFAULT_SAMPLE_RATE,
+      onAudioFrame: (frame: Buffer) => {
         audioFrames.push(frame);
       },
-      onComplete: () => {},
-      onError: (err: string) => {
-        console.error('TTS error:', err);
+      onChunk: (index, text, at) => {
+        chunks.push({ index, text, at });
       },
     });
 
-    await manager.connect();
-    manager.feedText('第一句');
-    manager.feedText('第二句');
-    await manager.finish();
+    await new Promise<void>((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
 
     expect(audioFrames.length).toBeGreaterThan(0);
-    manager.destroy();
+    expect(chunks.length).toBe(2);
   }, 30000);
 
-  it('can be destroyed', async () => {
-    const manager = new TTSManager({
+  it('receives first frame callback', async () => {
+    let firstFrameAt = 0;
+
+    const stream = bidirectionTtsStream({
       appkey: API_KEY,
       resourceId: 'seed-tts-2.0',
       voiceType: 'saturn_zh_female_aojiaonvyou_tob',
-      onAudio: () => {},
-      onComplete: () => {},
-      onError: () => {},
+      texts: ['简短测试。'],
+      encoding: 'pcm',
+      sampleRate: DEFAULT_SAMPLE_RATE,
+      onFirstFrame: (at: number) => {
+        firstFrameAt = at;
+      },
     });
 
-    await manager.connect();
-    expect(manager.isConnected()).toBe(true);
-    manager.destroy();
-    expect(manager.isConnected()).toBe(false);
+    await new Promise<void>((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+
+    expect(firstFrameAt).toBeGreaterThan(0);
   }, 30000);
 });

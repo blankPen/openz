@@ -11,16 +11,24 @@ import {
   CancelSession,
   ReceiveMessage,
   WaitForEvent,
+  type Message,
 } from './protocols.js';
 
 const DEFAULT_ENDPOINT = 'wss://openspeech.bytedance.com/api/v3/tts/bidirection';
+
+const log = (...args: any[]) =>
+  console.log(`[TTSManager]`, new Date().toISOString(), ...args);
 
 export interface TTSManagerOptions {
   appkey: string;
   resourceId: string;
   voiceType: string;
   endpoint?: string;
-  onAudio?: (frame: Buffer) => void;
+  /** Optional WebSocket for testing */
+  ws?: WebSocket;
+  onAudio?: (frame: Buffer, chunkIndex: number) => void;
+  onChunk?: (index: number, text: string, at: number) => void;
+  onFirstFrame?: (at: number, chunkIndex: number) => void;
   onComplete?: () => void;
   onError?: (err: string) => void;
 }
@@ -42,6 +50,9 @@ export class TTSManager {
       'X-Api-Resource-Id': opts.resourceId,
       'X-Api-Connect-Id': uuid.v4(),
     };
+    if (opts.ws) {
+      this.ws = opts.ws;
+    }
   }
 
   isConnected(): boolean {
@@ -52,10 +63,12 @@ export class TTSManager {
     if (this.destroyed) throw new Error('TTSManager already destroyed');
 
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(this.endpoint, {
-        headers: this.headers,
-        skipUTF8Validation: true,
-      });
+      if (!this.ws) {
+        this.ws = new WebSocket(this.endpoint, {
+          headers: this.headers,
+          skipUTF8Validation: true,
+        });
+      }
 
       this.ws.on('open', async () => {
         try {
@@ -73,7 +86,7 @@ export class TTSManager {
                 req_params: {
                   speaker: this.opts.voiceType,
                   audio_params: {
-                    format: 'mp3',
+                    format: 'pcm',
                     sample_rate: 24000,
                     enable_timestamp: true,
                   },
@@ -111,27 +124,85 @@ export class TTSManager {
     });
   }
 
-  feedText(text: string): void {
+  /**
+   * Run the full bidirectional TTS cycle:
+   * - sender: pulls text chunks and sends TaskRequest
+   * - receiver: collects audio frames and calls onAudio
+   * - both run concurrently via Promise.all
+   */
+  async run(texts: AsyncIterable<string> | Iterable<string>): Promise<void> {
     if (!this.ws || !this.sessionId || !this.connected) {
-      return;
+      throw new Error('not connected');
     }
 
-    const payload = new TextEncoder().encode(
-      JSON.stringify({
-        user: { uid: 'openz-daemon' },
-        req_params: {
-          speaker: this.opts.voiceType,
-          audio_params: {
-            format: 'mp3',
-            sample_rate: 24000,
-          },
-          text,
-        },
-        event: EventType.TaskRequest,
-      }),
-    );
+    const startedAt = Date.now();
+    let chunkIndex = 0;
+    let hasAnyChunk = false;
 
-    TaskRequest(this.ws, payload, this.sessionId);
+    const sender = (async () => {
+      for await (const chunk of texts) {
+        hasAnyChunk = true;
+        chunkIndex += 1;
+        const at = Date.now() - startedAt;
+        if (this.opts.onChunk) {
+          this.opts.onChunk(chunkIndex, chunk, at);
+        } else {
+          log(`[sender] chunk ${chunkIndex}: "${chunk.slice(0, 20)}..."`);
+        }
+
+        await TaskRequest(
+          this.ws!,
+          new TextEncoder().encode(
+            JSON.stringify({
+              user: { uid: 'openz-daemon' },
+              req_params: {
+                speaker: this.opts.voiceType,
+                audio_params: {
+                  format: 'pcm',
+                  sample_rate: 24000,
+                },
+                text: chunk,
+              },
+              event: EventType.TaskRequest,
+            }),
+          ),
+          this.sessionId,
+        );
+      }
+
+      if (!hasAnyChunk) {
+        throw new Error('texts 为空');
+      }
+
+      await FinishSession(this.ws!, this.sessionId);
+    })();
+
+    const receiver = (async () => {
+      let firstFrameLogged = false;
+      while (true) {
+        const msg = await ReceiveMessage(this.ws!);
+
+        if (msg.type === MsgType.AudioOnlyServer) {
+          if (!firstFrameLogged) {
+            firstFrameLogged = true;
+            const elapsed = Date.now() - startedAt;
+            this.opts.onFirstFrame?.(elapsed, chunkIndex);
+            log(`[receiver] first frame at +${elapsed}ms (chunk ${chunkIndex})`);
+          }
+          this.opts.onAudio?.(Buffer.from(msg.payload), chunkIndex);
+        } else if (msg.type === MsgType.FullServerResponse) {
+          if (msg.event === EventType.SessionFinished) {
+            break;
+          }
+        } else if (msg.type === MsgType.Error) {
+          const errText = new TextDecoder().decode(msg.payload);
+          this.opts.onError?.(`TTS error: ${errText}`);
+          break;
+        }
+      }
+    })();
+
+    await Promise.all([sender, receiver]);
   }
 
   async finish(): Promise<void> {
@@ -140,26 +211,9 @@ export class TTSManager {
     }
 
     this.connected = false;
-
+    this.destroyed = true;
     await FinishSession(this.ws, this.sessionId);
-
-    // Collect all audio frames until SessionFinished
-    while (true) {
-      const msg = await ReceiveMessage(this.ws);
-
-      if (msg.type === MsgType.AudioOnlyServer) {
-        this.opts.onAudio?.(Buffer.from(msg.payload));
-      } else if (msg.type === MsgType.FullServerResponse) {
-        if (msg.event === EventType.SessionFinished) {
-          break;
-        }
-      } else if (msg.type === MsgType.Error) {
-        throw new Error(`TTS error: ${new TextDecoder().decode(msg.payload)}`);
-      }
-    }
-
     await FinishConnection(this.ws);
-    this.ws.close();
     this.ws = null;
   }
 
