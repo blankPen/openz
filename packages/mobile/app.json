@@ -12,6 +12,9 @@
     },
     "android": {
       "package": "ai.openz.mobile"
+    },
+    "web": {
+      "bundler": "metro"
     }
   }
 }
