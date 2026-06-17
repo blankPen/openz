@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ClaudeAgent } from './claude.js';
-import type { AgentEvent } from '@uran/shared';
+import type { AgentEvent } from '@openz/shared';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 describe('ClaudeAgent', () => {

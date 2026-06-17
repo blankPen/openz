@@ -1,4 +1,4 @@
-import type { AgentEvent } from '@uran/shared';
+import type { AgentEvent } from '@openz/shared';
 
 export interface AgentSession {
   id: string;

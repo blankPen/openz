@@ -3,6 +3,7 @@ import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
 import { createServer } from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
+import { io, type Socket as ClientSocket } from 'socket.io-client';
 import { SessionManager } from './session.js';
 import { ClaudeAgent } from '../agents/claude.js';
 import { bidirectionTtsStream, DEFAULT_SAMPLE_RATE } from '@openz/speech/server';
@@ -19,14 +20,16 @@ import type {
 } from '@openz/shared';
 import { DEFAULT_PORT, getDaemonStatePath, type DaemonState } from './types.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
+import { randomUUID } from 'crypto';
 
-const LOG_FILE = `${process.env.HOME}/.uran/daemon.log`;
+const LOG_FILE = `${process.env.HOME}/.openz/daemon.log`;
+const DAEMON_STATE_DIR = `${process.env.HOME}/.openz`;
 
 function log(...args: any[]) {
   const msg = `[${new Date().toISOString()}] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')}`;
   console.log(msg);
   try {
-    mkdirSync(`${process.env.HOME}/.uran`, { recursive: true });
+    mkdirSync(DAEMON_STATE_DIR, { recursive: true });
     appendFileSync(LOG_FILE, msg + '\n');
   } catch (e) {
     // ignore
@@ -34,16 +37,26 @@ function log(...args: any[]) {
 }
 
 function saveDaemonState(state: DaemonState) {
-  const home = process.env.HOME || process.env.USERPROFILE || '';
-  const dir = `${home}/.uran`;
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  if (!existsSync(DAEMON_STATE_DIR)) mkdirSync(DAEMON_STATE_DIR, { recursive: true });
   writeFileSync(getDaemonStatePath(), JSON.stringify(state, null, 2));
 }
 
 // Active voice reply WebSocket connections, keyed by sessionId
 const voiceWsClients = new Map<string, WebSocket>();
 
-export async function startDaemon(port = DEFAULT_PORT) {
+export async function startDaemon(port = DEFAULT_PORT, serverUrl?: string) {
+  const daemonId = `daemon-${randomUUID().slice(0, 8)}`;
+
+  // If serverUrl is provided, run in relay mode (connect to remote server)
+  if (serverUrl) {
+    return startDaemonRelayMode(daemonId, serverUrl);
+  }
+
+  // Otherwise, run in direct mode (listen for connections)
+  return startDaemonDirectMode(port, daemonId);
+}
+
+async function startDaemonDirectMode(port: number, daemonId: string) {
   const httpServer = createServer();
   const io = new SocketIOServer(httpServer, {
     cors: { origin: '*' },
@@ -106,13 +119,11 @@ export async function startDaemon(port = DEFAULT_PORT) {
           cwd: req.cwd,
           model: req.model,
           onEvent: (event: AgentEvent) => {
-            // Forward event to all clients viewing this session
             const response: SessionEventResponse = { sessionId: session.id, event };
             socket.emit('session:event', response);
           },
         });
 
-        // Also listen for session-level events from the agent
         sessionManager.setOnEvent(session.id, (event: AgentEvent) => {
           const response: SessionEventResponse = { sessionId: session.id, event };
           socket.emit('session:event', response);
@@ -136,12 +147,9 @@ export async function startDaemon(port = DEFAULT_PORT) {
           return;
         }
 
-        // Update status to running
         sessionManager.updateSessionStatus(req.sessionId, 'running');
 
-        // Forward events to client
         sessionManager.setOnEvent(req.sessionId, (event: AgentEvent) => {
-          // Log agent response text for debugging
           if (event.type === 'text_delta') {
             log(`[Agent] ${event.data.text}`);
           } else {
@@ -151,7 +159,6 @@ export async function startDaemon(port = DEFAULT_PORT) {
           socket.emit('session:event', response);
         });
 
-        // Send message
         await sessionManager.sendMessage(req.sessionId, req.message);
         ack?.({ ok: true });
       } catch (err: any) {
@@ -160,7 +167,6 @@ export async function startDaemon(port = DEFAULT_PORT) {
     });
 
     // session:voice_reply — 使用 @openz/speech/server bidirectionTtsStream
-    // 音频通过 WebSocket 直发，text_delta 通过 Socket.IO 事件继续上报
     socket.on('session:voice_reply', async (req: SendVoiceReplyRequest, ack) => {
       log('session:voice_reply', req);
       try {
@@ -178,22 +184,17 @@ export async function startDaemon(port = DEFAULT_PORT) {
           return;
         }
 
-        // ws is guaranteed non-null here; capture in const for closure safety
         const wsClient = ws;
 
-        // --- 流式并发: AI text_delta 事件实时推入 TTS ---
         const textQueue: string[] = [];
         let resolveNextChunk: ((chunk: string) => void) | null = null;
         let ttsDone = false;
 
-        // 异步生成器: bidirectionTtsStream 的 texts 参数
-        // 每次 yield 都会等待 resolveNextChunk 被调用，即等待下一个 text_delta 句子
         async function* textStream(): AsyncGenerator<string> {
           while (!ttsDone || textQueue.length > 0) {
             if (textQueue.length > 0) {
               yield textQueue.shift()!;
             } else {
-              // 等待下一个 text_delta 句子到来
               await new Promise<string>((resolve) => {
                 resolveNextChunk = resolve;
               });
@@ -204,10 +205,8 @@ export async function startDaemon(port = DEFAULT_PORT) {
           }
         }
 
-        // 把 text_delta 句子推入队列
         const handleEvent = (event: AgentEvent) => {
           if (event.type === 'text_delta') {
-            // 按句子标点切分，实时推入 TTS
             const text = event.data.text;
             const sentences = text.match(/[^.。!！?？\n]+[.。!！?？\n]*/g);
             if (sentences) {
@@ -226,7 +225,6 @@ export async function startDaemon(port = DEFAULT_PORT) {
 
           if (event.type === 'turn_done' || event.type === 'assistant_complete') {
             ttsDone = true;
-            // 剩余文本
             const remaining = textQueue.shift();
             if (remaining && resolveNextChunk) {
               resolveNextChunk(remaining);
@@ -234,7 +232,6 @@ export async function startDaemon(port = DEFAULT_PORT) {
             }
           }
 
-          // 继续转发 text_delta 事件给 Socket.IO 客户端
           const response: SessionEventResponse = { sessionId, event };
           socket.emit('session:event', response);
         };
@@ -244,7 +241,6 @@ export async function startDaemon(port = DEFAULT_PORT) {
 
         const startedAt = Date.now();
 
-        // 使用 bidirectionTtsStream 流式合成
         async function runTtsStream() {
           try {
             const stream = bidirectionTtsStream({
@@ -273,7 +269,6 @@ export async function startDaemon(port = DEFAULT_PORT) {
               },
             });
 
-            // Drain the stream
             await new Promise<void>((resolve, reject) => {
               stream.on('end', resolve);
               stream.on('error', reject);
@@ -292,12 +287,10 @@ export async function startDaemon(port = DEFAULT_PORT) {
           }
         }
 
-        // 启动 AI 处理（非阻塞）
         sessionManager.sendMessage(sessionId, req.message).catch((err) => {
           log('[TTS] sendMessage error:', err);
         });
 
-        // 启动 TTS 流（并行）
         runTtsStream();
 
         ack?.({ ok: true });
@@ -335,16 +328,137 @@ export async function startDaemon(port = DEFAULT_PORT) {
   });
 
   httpServer.listen(port, () => {
-    console.log(`Uran daemon listening on http://localhost:${port}`);
+    console.log(`Openz daemon listening on http://localhost:${port}`);
     console.log(`TTS WebSocket endpoint: ws://localhost:${port}/api/tts/ws?sessionId=<sessionId>`);
   });
 
-  // 优雅退出
   process.on('SIGINT', () => {
     console.log('\nShutting down...');
     io.close();
     wss.close();
     httpServer.close();
+    process.exit(0);
+  });
+}
+
+// Relay mode - connect to remote server instead of listening
+async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
+  const agent = new ClaudeAgent();
+  const sessionManager = new SessionManager(agent);
+
+  const socket: ClientSocket = io(serverUrl, {
+    transports: ['websocket'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+  });
+
+  const state: DaemonState = {
+    pid: process.pid,
+    port: 0,
+    version: '0.1.0',
+    startedAt: Date.now(),
+  };
+  saveDaemonState(state);
+
+  socket.on('connect', () => {
+    log(`Connected to Openz Server: ${serverUrl}`);
+    console.log(`Openz daemon connected to server: ${serverUrl}`);
+    socket.emit('daemon:register', { daemonId });
+  });
+
+  socket.on('daemon:registered', (data: { daemonId: string }) => {
+    log(`Registered with server as: ${data.daemonId}`);
+    console.log(`Daemon registered with server: ${data.daemonId}`);
+  });
+
+  socket.on('daemon:ping', (data: { timestamp: number }) => {
+    socket.emit('daemon:pong', { timestamp: data.timestamp });
+  });
+
+  socket.on('session:create', async (req: CreateSessionRequest, ack) => {
+    log('session:create (relay)', req);
+    try {
+      const session = await sessionManager.createSession({
+        id: req.id,
+        engine: req.engine,
+        cwd: req.cwd,
+        model: req.model,
+        onEvent: (event: AgentEvent) => {
+          socket.emit('daemon:session_event', { sessionId: session.id, event });
+        },
+      });
+
+      sessionManager.setOnEvent(session.id, (event: AgentEvent) => {
+        socket.emit('daemon:session_event', { sessionId: session.id, event });
+      });
+
+      socket.emit('daemon:session_created', { daemonId, sessionId: session.id, session });
+
+      const response: SessionCreatedResponse = { session };
+      ack?.(response);
+      socket.emit('session:created', response);
+    } catch (err: any) {
+      ack?.({ error: err.message });
+    }
+  });
+
+  socket.on('session:send', async (req: SendMessageRequest, ack) => {
+    log('session:send (relay)', req);
+    try {
+      const entry = sessionManager.getSession(req.sessionId);
+      if (!entry) {
+        ack?.({ error: `Session ${req.sessionId} not found` });
+        return;
+      }
+
+      sessionManager.updateSessionStatus(req.sessionId, 'running');
+
+      sessionManager.setOnEvent(req.sessionId, (event: AgentEvent) => {
+        socket.emit('daemon:session_event', { sessionId: req.sessionId, event });
+      });
+
+      await sessionManager.sendMessage(req.sessionId, req.message);
+      ack?.({ ok: true });
+    } catch (err: any) {
+      ack?.({ error: err.message });
+    }
+  });
+
+  socket.on('session:interrupt', (req: SessionRequest, ack) => {
+    sessionManager.interruptSession(req.sessionId);
+    sessionManager.updateSessionStatus(req.sessionId, 'interrupted');
+    ack?.({ ok: true });
+  });
+
+  socket.on('session:stop', (req: SessionRequest, ack) => {
+    sessionManager.stopSession(req.sessionId);
+    sessionManager.updateSessionStatus(req.sessionId, 'done');
+    ack?.({ ok: true });
+  });
+
+  socket.on('session:list', (_, ack) => {
+    const sessions = sessionManager.getAllSessions();
+    const response: SessionListResponse = { sessions };
+    ack?.(response);
+  });
+
+  socket.on('session:delete', (req: SessionRequest, ack) => {
+    sessionManager.deleteSession(req.sessionId);
+    ack?.({ ok: true });
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`Disconnected from server: ${serverUrl}`);
+  });
+
+  socket.on('connect_error', (err) => {
+    console.error(`Failed to connect to server: ${err.message}`);
+  });
+
+  process.on('SIGINT', () => {
+    console.log('\nShutting down...');
+    socket.disconnect();
     process.exit(0);
   });
 }

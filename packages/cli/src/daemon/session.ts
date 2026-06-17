@@ -1,10 +1,10 @@
-import type { Session, AgentEvent } from '@uran/shared';
-import { generateSessionId } from '@uran/shared';
+import type { Session, AgentEvent } from '@openz/shared';
+import { generateSessionId } from '@openz/shared';
 import type { Agent, AgentSession } from '../agents/mod.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
-const SESSIONS_FILE = join(process.env.HOME || '/tmp', '.uran', 'sessions.json');
+const SESSIONS_FILE = join(process.env.HOME || '/tmp', '.openz', 'sessions.json');
 
 export class SessionManager {
   private sessions = new Map<string, {
@@ -41,7 +41,7 @@ export class SessionManager {
 
   private saveSessions() {
     try {
-      const dir = join(process.env.HOME || '/tmp', '.uran');
+      const dir = join(process.env.HOME || '/tmp', '.openz');
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
       const arr = Array.from(this.sessions.values())
         .filter(e => e.session.status !== 'running') // Don't save running sessions
