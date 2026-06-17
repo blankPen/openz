@@ -119,11 +119,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // ── ModelSwitchSheet ──────────────────────────────────────────────────────────
 
 export function ModelSwitchSheet({ visible, onClose, testID }: Props) {
-  const { palette } = useTheme();
+  const { palette, tokens } = useTheme();
 
   return (
-    <BottomSheet visible={visible} title="切换模型" onClose={onClose} testID={testID}>
+    <BottomSheet visible={visible} title="切换模型/模式" onClose={onClose} testID={testID}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Subtitle */}
+        <Text style={{ color: palette.fg3, fontSize: tokens.fontSize.sm, marginBottom: 16, marginLeft: 4 }}>
+          选择后立即生效，下一条消息生效
+        </Text>
+
         {/* 基础模型 */}
         <Section title="基础模型">
           {MODELS.map((m) => (
