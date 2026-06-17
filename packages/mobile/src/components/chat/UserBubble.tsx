@@ -11,6 +11,7 @@ export function UserBubble({ content, timestamp }: Props) {
   return (
     <View style={{ alignItems: 'flex-end' }}>
       <View
+        testID="user-bubble"
         style={{
           maxWidth: '78%',
           backgroundColor: palette.primary,

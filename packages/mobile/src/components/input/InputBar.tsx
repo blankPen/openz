@@ -2,9 +2,8 @@ import { useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { TextField } from './TextField';
 import { MicButton } from './MicButton';
-import { AttachmentButton } from './AttachmentButton';
+import { PlusButton } from './PlusButton';
 import { SendButton } from './SendButton';
-import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
   onSend?: (text: string) => void;
@@ -13,7 +12,6 @@ type Props = {
 };
 
 export function InputBar({ onSend, onAttachment, onMic }: Props) {
-  const { palette } = useTheme();
   const [text, setText] = useState('');
 
   const handleSend = useCallback(() => {
@@ -24,35 +22,50 @@ export function InputBar({ onSend, onAttachment, onMic }: Props) {
   }, [text, onSend]);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
-      <AttachmentButton onPress={onAttachment} testID="attachment-button" />
-      <View style={styles.inputWrapper}>
+    <View style={styles.container} testID="input-bar-container">
+      <View style={styles.inputBox} testID="input-box">
         <TextField
           value={text}
           onChangeText={setText}
-          placeholder="输入消息..."
+          placeholder="尽管问，带图也行"
           accessibilityLabel="消息输入框"
         />
       </View>
-      {text.trim() ? (
-        <SendButton onPress={handleSend} accessibilityLabel="发送消息" />
-      ) : (
-        <MicButton onPress={onMic} accessibilityLabel="语音输入" />
-      )}
+      <View style={styles.inputActionsRow}>
+        {text.trim() ? null : <MicButton onPress={onMic} accessibilityLabel="语音输入" />}
+        <View style={styles.inputActionsRight} testID="input-actions-right">
+          <PlusButton onPress={onAttachment} testID="plus-button" />
+          <SendButton
+            onPress={handleSend}
+            disabled={!text.trim()}
+            testID="send-button"
+            accessibilityLabel="发送消息"
+          />
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 8,
   },
-  inputWrapper: {
-    flex: 1,
+  inputBox: {
+    backgroundColor: '#F2F2F2',
+    borderRadius: 16,
+    padding: 10,
+    minHeight: 56,
+  },
+  inputActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  inputActionsRight: {
+    flexDirection: 'column',
+    gap: 8,
   },
 });

@@ -39,13 +39,13 @@ export function AIBubble({ content, timestamp }: Props) {
   return (
     <View style={{ alignItems: 'flex-start' }}>
       <View
+        testID="ai-bubble"
         style={{
           maxWidth: '88%',
           backgroundColor: palette.surface,
-          borderRadius: 4,
-          borderTopLeftRadius: 18,
-          borderBottomLeftRadius: 18,
-          borderBottomRightRadius: 18,
+          borderRadius: 18,
+          borderTopLeftRadius: 4,
+          borderTopRightRadius: 18,
           paddingVertical: 12,
           paddingHorizontal: 14,
         }}

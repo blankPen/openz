@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1781713447257" clover="3.2.0">
+  <project timestamp="1781713447257" name="All files">
+    <metrics statements="345" coveredstatements="318" conditionals="251" coveredconditionals="197" methods="149" coveredmethods="134" elements="745" coveredelements="649" complexity="0" loc="345" ncloc="345" packages="13" files="42" classes="42"/>
+    <package name="src">
+      <metrics statements="11" coveredstatements="10" conditionals="8" coveredconditionals="7" methods="5" coveredmethods="5"/>
+      <file name="ThemeProvider.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/ThemeProvider.tsx">
+        <metrics statements="11" coveredstatements="10" conditionals="8" coveredconditionals="7" methods="5" coveredmethods="5"/>
+        <line num="15" count="104" type="stmt"/>
+        <line num="16" count="313" type="stmt"/>
+        <line num="17" count="313" type="stmt"/>
+        <line num="19" count="104" type="cond" truecount="2" falsecount="0"/>
+        <line num="20" count="104" type="stmt"/>
+        <line num="21" count="104" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="102" type="cond" truecount="1" falsecount="1"/>
+        <line num="23" count="0" type="stmt"/>
+        <line num="26" count="104" type="stmt"/>
+        <line num="27" count="104" type="stmt"/>
+        <line num="37" count="104" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.chat">
+      <metrics statements="47" coveredstatements="40" conditionals="58" coveredconditionals="42" methods="18" coveredmethods="18"/>
+      <file name="AIActionsBar.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/AIActionsBar.tsx">
+        <metrics statements="5" coveredstatements="5" conditionals="12" coveredconditionals="11" methods="3" coveredmethods="3"/>
+        <line num="21" count="5" type="stmt"/>
+        <line num="23" count="5" type="stmt"/>
+        <line num="30" count="5" type="stmt"/>
+        <line num="33" count="20" type="stmt"/>
+        <line num="36" count="20" type="stmt"/>
+      </file>
+      <file name="AIBubble.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/AIBubble.tsx">
+        <metrics statements="17" coveredstatements="10" conditionals="8" coveredconditionals="1" methods="2" coveredmethods="2"/>
+        <line num="11" count="4" type="stmt"/>
+        <line num="12" count="4" type="stmt"/>
+        <line num="13" count="4" type="stmt"/>
+        <line num="15" count="4" type="stmt"/>
+        <line num="16" count="4" type="stmt"/>
+        <line num="17" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="18" count="0" type="stmt"/>
+        <line num="20" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="21" count="0" type="stmt"/>
+        <line num="22" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="23" count="0" type="stmt"/>
+        <line num="29" count="0" type="stmt"/>
+        <line num="31" count="4" type="cond" truecount="1" falsecount="1"/>
+        <line num="32" count="4" type="stmt"/>
+        <line num="34" count="4" type="stmt"/>
+        <line num="38" count="4" type="stmt"/>
+        <line num="39" count="4" type="stmt"/>
+      </file>
+      <file name="CodeBlock.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/CodeBlock.tsx">
+        <metrics statements="4" coveredstatements="4" conditionals="4" coveredconditionals="3" methods="3" coveredmethods="3"/>
+        <line num="13" count="2" type="stmt"/>
+        <line num="14" count="2" type="stmt"/>
+        <line num="38" count="1" type="stmt"/>
+        <line num="39" count="2" type="cond" truecount="1" falsecount="1"/>
+      </file>
+      <file name="MessageRow.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/MessageRow.tsx">
+        <metrics statements="4" coveredstatements="4" conditionals="12" coveredconditionals="8" methods="1" coveredmethods="1"/>
+        <line num="19" count="4" type="stmt"/>
+        <line num="21" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="2" type="stmt"/>
+        <line num="30" count="2" type="stmt"/>
+      </file>
+      <file name="SourceItem.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/SourceItem.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="11" count="4" type="stmt"/>
+        <line num="14" count="4" type="stmt"/>
+        <line num="16" count="4" type="stmt"/>
+      </file>
+      <file name="StreamingIndicator.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/StreamingIndicator.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="5" count="3" type="stmt"/>
+        <line num="7" count="3" type="stmt"/>
+        <line num="17" count="2" type="stmt"/>
+      </file>
+      <file name="ThinkingCard.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/ThinkingCard.tsx">
+        <metrics statements="4" coveredstatements="4" conditionals="9" coveredconditionals="8" methods="3" coveredmethods="3"/>
+        <line num="15" count="4" type="stmt"/>
+        <line num="16" count="4" type="stmt"/>
+        <line num="20" count="4" type="stmt"/>
+        <line num="59" count="2" type="stmt"/>
+      </file>
+      <file name="ToolCallCard.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/ToolCallCard.tsx">
+        <metrics statements="5" coveredstatements="5" conditionals="13" coveredconditionals="11" methods="3" coveredmethods="3"/>
+        <line num="14" count="3" type="stmt"/>
+        <line num="15" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="17" count="3" type="stmt"/>
+        <line num="30" count="3" type="stmt"/>
+        <line num="76" count="2" type="stmt"/>
+      </file>
+      <file name="UserBubble.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chat/UserBubble.tsx">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="10" count="4" type="stmt"/>
+        <line num="11" count="4" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.chrome">
+      <metrics statements="5" coveredstatements="5" conditionals="0" coveredconditionals="0" methods="3" coveredmethods="3"/>
+      <file name="DynamicIsland.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chrome/DynamicIsland.tsx">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="4" count="16" type="stmt"/>
+      </file>
+      <file name="HomeIndicator.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chrome/HomeIndicator.tsx">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="5" count="16" type="stmt"/>
+        <line num="6" count="16" type="stmt"/>
+      </file>
+      <file name="StatusBar.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/chrome/StatusBar.tsx">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="7" count="16" type="stmt"/>
+        <line num="8" count="16" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.common">
+      <metrics statements="54" coveredstatements="48" conditionals="65" coveredconditionals="57" methods="6" coveredmethods="6"/>
+      <file name="Avatar.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/common/Avatar.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="3" coveredconditionals="3" methods="1" coveredmethods="1"/>
+        <line num="12" count="24" type="stmt"/>
+        <line num="13" count="24" type="cond" truecount="2" falsecount="0"/>
+        <line num="14" count="24" type="stmt"/>
+      </file>
+      <file name="Icon.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/common/Icon.tsx">
+        <metrics statements="44" coveredstatements="38" conditionals="43" coveredconditionals="37" methods="1" coveredmethods="1"/>
+        <line num="14" count="450" type="stmt"/>
+        <line num="15" count="450" type="cond" truecount="36" falsecount="6"/>
+        <line num="16" count="10" type="stmt"/>
+        <line num="17" count="0" type="stmt"/>
+        <line num="18" count="0" type="stmt"/>
+        <line num="19" count="7" type="stmt"/>
+        <line num="20" count="1" type="stmt"/>
+        <line num="21" count="35" type="stmt"/>
+        <line num="22" count="23" type="stmt"/>
+        <line num="23" count="9" type="stmt"/>
+        <line num="24" count="7" type="stmt"/>
+        <line num="25" count="5" type="stmt"/>
+        <line num="26" count="0" type="stmt"/>
+        <line num="27" count="5" type="stmt"/>
+        <line num="28" count="5" type="stmt"/>
+        <line num="29" count="28" type="stmt"/>
+        <line num="30" count="26" type="stmt"/>
+        <line num="31" count="30" type="stmt"/>
+        <line num="32" count="9" type="stmt"/>
+        <line num="33" count="6" type="stmt"/>
+        <line num="34" count="6" type="stmt"/>
+        <line num="35" count="7" type="stmt"/>
+        <line num="36" count="16" type="stmt"/>
+        <line num="37" count="1" type="stmt"/>
+        <line num="38" count="13" type="stmt"/>
+        <line num="39" count="0" type="stmt"/>
+        <line num="40" count="12" type="stmt"/>
+        <line num="41" count="12" type="stmt"/>
+        <line num="42" count="12" type="stmt"/>
+        <line num="43" count="8" type="stmt"/>
+        <line num="44" count="8" type="stmt"/>
+        <line num="45" count="1" type="stmt"/>
+        <line num="46" count="1" type="stmt"/>
+        <line num="47" count="97" type="stmt"/>
+        <line num="48" count="5" type="stmt"/>
+        <line num="49" count="6" type="stmt"/>
+        <line num="50" count="1" type="stmt"/>
+        <line num="51" count="8" type="stmt"/>
+        <line num="52" count="9" type="stmt"/>
+        <line num="53" count="0" type="stmt"/>
+        <line num="54" count="0" type="stmt"/>
+        <line num="55" count="7" type="stmt"/>
+        <line num="56" count="7" type="stmt"/>
+        <line num="57" count="7" type="stmt"/>
+      </file>
+      <file name="Pill.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/common/Pill.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="8" coveredconditionals="7" methods="2" coveredmethods="2"/>
+        <line num="13" count="12" type="stmt"/>
+        <line num="14" count="12" type="stmt"/>
+        <line num="17" count="12" type="cond" truecount="1" falsecount="1"/>
+      </file>
+      <file name="ToolCard.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/common/ToolCard.tsx">
+        <metrics statements="4" coveredstatements="4" conditionals="11" coveredconditionals="10" methods="2" coveredmethods="2"/>
+        <line num="15" count="59" type="stmt"/>
+        <line num="16" count="59" type="cond" truecount="2" falsecount="0"/>
+        <line num="17" count="59" type="stmt"/>
+        <line num="20" count="59" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.drawer">
+      <metrics statements="31" coveredstatements="30" conditionals="35" coveredconditionals="28" methods="24" coveredmethods="18"/>
+      <file name="SettingsDrawer.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/drawer/SettingsDrawer.tsx">
+        <metrics statements="28" coveredstatements="27" conditionals="29" coveredconditionals="22" methods="22" coveredmethods="16"/>
+        <line num="36" count="70" type="stmt"/>
+        <line num="37" count="70" type="stmt"/>
+        <line num="40" count="70" type="stmt"/>
+        <line num="68" count="7" type="stmt"/>
+        <line num="69" count="7" type="stmt"/>
+        <line num="75" count="7" type="stmt"/>
+        <line num="78" count="21" type="stmt"/>
+        <line num="79" count="21" type="stmt"/>
+        <line num="82" count="0" type="stmt"/>
+        <line num="111" count="28" type="stmt"/>
+        <line num="112" count="28" type="stmt"/>
+        <line num="125" count="8" type="stmt"/>
+        <line num="126" count="8" type="stmt"/>
+        <line num="128" count="24" type="stmt"/>
+        <line num="129" count="24" type="stmt"/>
+        <line num="130" count="24" type="stmt"/>
+        <line num="131" count="24" type="stmt"/>
+        <line num="132" count="24" type="stmt"/>
+        <line num="133" count="24" type="stmt"/>
+        <line num="134" count="24" type="stmt"/>
+        <line num="135" count="24" type="stmt"/>
+        <line num="137" count="8" type="stmt"/>
+        <line num="138" count="8" type="stmt"/>
+        <line num="145" count="8" type="stmt"/>
+        <line num="146" count="8" type="stmt"/>
+        <line num="148" count="8" type="stmt"/>
+        <line num="224" count="7" type="stmt"/>
+        <line num="241" count="1" type="stmt"/>
+      </file>
+      <file name="Switch.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/drawer/Switch.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="6" coveredconditionals="6" methods="2" coveredmethods="2"/>
+        <line num="11" count="26" type="stmt"/>
+        <line num="12" count="26" type="stmt"/>
+        <line num="15" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.home">
+      <metrics statements="7" coveredstatements="7" conditionals="3" coveredconditionals="3" methods="3" coveredmethods="3"/>
+      <file name="ToolsStrip.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/home/ToolsStrip.tsx">
+        <metrics statements="4" coveredstatements="4" conditionals="1" coveredconditionals="1" methods="2" coveredmethods="2"/>
+        <line num="19" count="2" type="stmt"/>
+        <line num="28" count="14" type="stmt"/>
+        <line num="29" count="14" type="stmt"/>
+        <line num="37" count="57" type="stmt"/>
+      </file>
+      <file name="WelcomeSection.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/home/WelcomeSection.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1"/>
+        <line num="18" count="15" type="stmt"/>
+        <line num="21" count="15" type="stmt"/>
+        <line num="23" count="15" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.input">
+      <metrics statements="24" coveredstatements="22" conditionals="19" coveredconditionals="11" methods="10" coveredmethods="9"/>
+      <file name="AttachmentButton.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/input/AttachmentButton.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="3" coveredconditionals="2" methods="2" coveredmethods="2"/>
+        <line num="8" count="25" type="stmt"/>
+        <line num="9" count="25" type="stmt"/>
+        <line num="16" count="25" type="stmt"/>
+      </file>
+      <file name="InputBar.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/input/InputBar.tsx">
+        <metrics statements="9" coveredstatements="9" conditionals="4" coveredconditionals="3" methods="2" coveredmethods="2"/>
+        <line num="16" count="25" type="stmt"/>
+        <line num="17" count="25" type="stmt"/>
+        <line num="19" count="25" type="stmt"/>
+        <line num="20" count="1" type="stmt"/>
+        <line num="21" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="23" count="1" type="stmt"/>
+        <line num="26" count="25" type="stmt"/>
+        <line num="46" count="3" type="stmt"/>
+      </file>
+      <file name="MicButton.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/input/MicButton.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="3" coveredconditionals="1" methods="2" coveredmethods="2"/>
+        <line num="8" count="23" type="stmt"/>
+        <line num="9" count="23" type="stmt"/>
+        <line num="14" count="23" type="stmt"/>
+      </file>
+      <file name="SendButton.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/input/SendButton.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="7" coveredconditionals="3" methods="2" coveredmethods="2"/>
+        <line num="8" count="2" type="stmt"/>
+        <line num="9" count="2" type="stmt"/>
+        <line num="15" count="2" type="stmt"/>
+      </file>
+      <file name="TextField.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/input/TextField.tsx">
+        <metrics statements="6" coveredstatements="4" conditionals="2" coveredconditionals="2" methods="2" coveredmethods="1"/>
+        <line num="11" count="25" type="stmt"/>
+        <line num="12" count="25" type="stmt"/>
+        <line num="14" count="25" type="stmt"/>
+        <line num="16" count="0" type="stmt"/>
+        <line num="17" count="0" type="stmt"/>
+        <line num="22" count="25" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.sheets">
+      <metrics statements="30" coveredstatements="30" conditionals="24" coveredconditionals="21" methods="17" coveredmethods="16"/>
+      <file name="AttachmentSheet.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/sheets/AttachmentSheet.tsx">
+        <metrics statements="9" coveredstatements="9" conditionals="2" coveredconditionals="1" methods="6" coveredmethods="5"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="30" count="5" type="stmt"/>
+        <line num="31" count="5" type="stmt"/>
+        <line num="34" count="20" type="stmt"/>
+        <line num="37" count="20" type="stmt"/>
+        <line num="65" count="1" type="stmt"/>
+        <line num="74" count="6" type="stmt"/>
+        <line num="76" count="6" type="stmt"/>
+        <line num="96" count="18" type="stmt"/>
+      </file>
+      <file name="BottomSheet.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/sheets/BottomSheet.tsx">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="14" count="38" type="stmt"/>
+        <line num="15" count="38" type="stmt"/>
+      </file>
+      <file name="FileCard.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/sheets/FileCard.tsx">
+        <metrics statements="2" coveredstatements="2" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1"/>
+        <line num="12" count="19" type="stmt"/>
+        <line num="14" count="19" type="stmt"/>
+      </file>
+      <file name="ModelOption.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/sheets/ModelOption.tsx">
+        <metrics statements="4" coveredstatements="4" conditionals="14" coveredconditionals="12" methods="3" coveredmethods="3"/>
+        <line num="14" count="89" type="stmt"/>
+        <line num="16" count="89" type="stmt"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="20" count="89" type="stmt"/>
+      </file>
+      <file name="ModelSwitchSheet.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/sheets/ModelSwitchSheet.tsx">
+        <metrics statements="10" coveredstatements="10" conditionals="0" coveredconditionals="0" methods="5" coveredmethods="5"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="45" count="1" type="stmt"/>
+        <line num="76" count="1" type="stmt"/>
+        <line num="106" count="24" type="stmt"/>
+        <line num="107" count="24" type="stmt"/>
+        <line num="122" count="9" type="stmt"/>
+        <line num="124" count="9" type="stmt"/>
+        <line num="130" count="27" type="stmt"/>
+        <line num="137" count="36" type="stmt"/>
+        <line num="148" count="27" type="stmt"/>
+      </file>
+      <file name="SheetHeader.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/sheets/SheetHeader.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="6" coveredconditionals="6" methods="1" coveredmethods="1"/>
+        <line num="17" count="8" type="stmt"/>
+        <line num="19" count="8" type="stmt"/>
+        <line num="48" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.components.topbar">
+      <metrics statements="3" coveredstatements="3" conditionals="5" coveredconditionals="3" methods="2" coveredmethods="2"/>
+      <file name="IconButton.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/components/topbar/IconButton.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="5" coveredconditionals="3" methods="2" coveredmethods="2"/>
+        <line num="14" count="51" type="stmt"/>
+        <line num="15" count="51" type="stmt"/>
+        <line num="20" count="51" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.hooks">
+      <metrics statements="5" coveredstatements="5" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1"/>
+      <file name="useTheme.ts" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/hooks/useTheme.ts">
+        <metrics statements="5" coveredstatements="5" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1"/>
+        <line num="14" count="27" type="stmt"/>
+        <line num="17" count="699" type="stmt"/>
+        <line num="18" count="698" type="cond" truecount="2" falsecount="0"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="21" count="697" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.screens">
+      <metrics statements="39" coveredstatements="31" conditionals="12" coveredconditionals="9" methods="19" coveredmethods="12"/>
+      <file name="ChatScreen.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/screens/ChatScreen.tsx">
+        <metrics statements="12" coveredstatements="9" conditionals="8" coveredconditionals="5" methods="7" coveredmethods="6"/>
+        <line num="13" count="6" type="stmt"/>
+        <line num="14" count="18" type="stmt"/>
+        <line num="15" count="18" type="stmt"/>
+        <line num="16" count="18" type="stmt"/>
+        <line num="17" count="18" type="stmt"/>
+        <line num="19" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="6" type="stmt"/>
+        <line num="24" count="6" type="stmt"/>
+        <line num="30" count="2" type="stmt"/>
+        <line num="36" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="37" count="0" type="stmt"/>
+        <line num="47" count="0" type="stmt"/>
+      </file>
+      <file name="HomeScreen.tsx" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/screens/HomeScreen.tsx">
+        <metrics statements="27" coveredstatements="22" conditionals="4" coveredconditionals="4" methods="12" coveredmethods="6"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="48" count="11" type="stmt"/>
+        <line num="49" count="10" type="stmt"/>
+        <line num="50" count="10" type="stmt"/>
+        <line num="51" count="10" type="stmt"/>
+        <line num="62" count="10" type="stmt"/>
+        <line num="64" count="10" type="stmt"/>
+        <line num="65" count="1" type="stmt"/>
+        <line num="66" count="1" type="stmt"/>
+        <line num="81" count="10" type="stmt"/>
+        <line num="82" count="0" type="stmt"/>
+        <line num="93" count="0" type="stmt"/>
+        <line num="96" count="10" type="stmt"/>
+        <line num="97" count="0" type="stmt"/>
+        <line num="100" count="10" type="stmt"/>
+        <line num="101" count="1" type="stmt"/>
+        <line num="104" count="10" type="stmt"/>
+        <line num="105" count="1" type="stmt"/>
+        <line num="108" count="10" type="stmt"/>
+        <line num="109" count="1" type="stmt"/>
+        <line num="112" count="10" type="stmt"/>
+        <line num="114" count="0" type="stmt"/>
+        <line num="119" count="10" type="stmt"/>
+        <line num="184" count="0" type="stmt"/>
+        <line num="201" count="20" type="stmt"/>
+        <line num="224" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.stores">
+      <metrics statements="86" coveredstatements="84" conditionals="20" coveredconditionals="14" methods="41" coveredmethods="41"/>
+      <file name="chatStore.ts" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/stores/chatStore.ts">
+        <metrics statements="51" coveredstatements="50" conditionals="18" coveredconditionals="12" methods="22" coveredmethods="22"/>
+        <line num="5" count="5" type="stmt"/>
+        <line num="6" count="5" type="stmt"/>
+        <line num="23" count="5" type="stmt"/>
+        <line num="29" count="5" type="stmt"/>
+        <line num="30" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="31" count="3" type="stmt"/>
+        <line num="32" count="3" type="stmt"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="54" count="40" type="stmt"/>
+        <line num="64" count="18" type="stmt"/>
+        <line num="67" count="5" type="stmt"/>
+        <line num="71" count="4" type="stmt"/>
+        <line num="74" count="3" type="stmt"/>
+        <line num="75" count="3" type="stmt"/>
+        <line num="79" count="18" type="stmt"/>
+        <line num="80" count="18" type="stmt"/>
+        <line num="81" count="18" type="stmt"/>
+        <line num="88" count="18" type="stmt"/>
+        <line num="92" count="18" type="stmt"/>
+        <line num="93" count="18" type="stmt"/>
+        <line num="97" count="2" type="stmt"/>
+        <line num="98" count="2" type="stmt"/>
+        <line num="100" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="101" count="2" type="stmt"/>
+        <line num="103" count="2" type="stmt"/>
+        <line num="107" count="1" type="stmt"/>
+        <line num="108" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="109" count="1" type="stmt"/>
+        <line num="116" count="1" type="stmt"/>
+        <line num="120" count="12" type="stmt"/>
+        <line num="121" count="12" type="stmt"/>
+        <line num="122" count="12" type="cond" truecount="1" falsecount="1"/>
+        <line num="123" count="12" type="stmt"/>
+        <line num="135" count="12" type="stmt"/>
+        <line num="139" count="2" type="stmt"/>
+        <line num="140" count="2" type="stmt"/>
+        <line num="141" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="142" count="2" type="stmt"/>
+        <line num="148" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="155" count="2" type="stmt"/>
+        <line num="159" count="1" type="stmt"/>
+        <line num="160" count="1" type="stmt"/>
+        <line num="161" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="162" count="1" type="stmt"/>
+        <line num="167" count="2" type="stmt"/>
+        <line num="173" count="1" type="stmt"/>
+        <line num="177" count="1" type="stmt"/>
+        <line num="178" count="1" type="stmt"/>
+        <line num="179" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="180" count="1" type="stmt"/>
+        <line num="187" count="1" type="stmt"/>
+      </file>
+      <file name="settingsStore.ts" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/stores/settingsStore.ts">
+        <metrics statements="24" coveredstatements="23" conditionals="2" coveredconditionals="2" methods="10" coveredmethods="10"/>
+        <line num="4" count="38" type="stmt"/>
+        <line num="5" count="38" type="stmt"/>
+        <line num="21" count="38" type="stmt"/>
+        <line num="32" count="38" type="stmt"/>
+        <line num="33" count="38" type="cond" truecount="2" falsecount="0"/>
+        <line num="34" count="8" type="stmt"/>
+        <line num="35" count="8" type="stmt"/>
+        <line num="37" count="0" type="stmt"/>
+        <line num="52" count="24" type="stmt"/>
+        <line num="66" count="38" type="stmt"/>
+        <line num="69" count="3" type="stmt"/>
+        <line num="70" count="3" type="stmt"/>
+        <line num="73" count="6" type="stmt"/>
+        <line num="74" count="6" type="stmt"/>
+        <line num="77" count="4" type="stmt"/>
+        <line num="78" count="4" type="stmt"/>
+        <line num="81" count="3" type="stmt"/>
+        <line num="82" count="3" type="stmt"/>
+        <line num="85" count="3" type="stmt"/>
+        <line num="86" count="3" type="stmt"/>
+        <line num="89" count="3" type="stmt"/>
+        <line num="90" count="3" type="stmt"/>
+        <line num="93" count="2" type="stmt"/>
+        <line num="94" count="2" type="stmt"/>
+      </file>
+      <file name="sheetStore.ts" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/stores/sheetStore.ts">
+        <metrics statements="11" coveredstatements="11" conditionals="0" coveredconditionals="0" methods="9" coveredmethods="9"/>
+        <line num="9" count="2" type="stmt"/>
+        <line num="20" count="2" type="stmt"/>
+        <line num="42" count="2" type="stmt"/>
+        <line num="45" count="4" type="stmt"/>
+        <line num="47" count="3" type="stmt"/>
+        <line num="48" count="1" type="stmt"/>
+        <line num="50" count="3" type="stmt"/>
+        <line num="51" count="1" type="stmt"/>
+        <line num="53" count="4" type="stmt"/>
+        <line num="56" count="1" type="stmt"/>
+        <line num="58" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.theme">
+      <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="dark.ts" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/theme/dark.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="4" count="28" type="stmt"/>
+      </file>
+      <file name="light.ts" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/theme/light.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="2" count="28" type="stmt"/>
+      </file>
+      <file name="tokens.ts" path="/Users/pz/workspace/claude-code-assistant/packages/mobile/src/theme/tokens.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="2" count="28" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>

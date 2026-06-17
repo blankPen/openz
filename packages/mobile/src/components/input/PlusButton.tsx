@@ -2,15 +2,16 @@ import { Pressable } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { Icon } from '../common/Icon';
 
-type Props = { onPress?: () => void; disabled?: boolean; accessibilityLabel?: string };
+type Props = { onPress?: () => void; accessibilityLabel?: string; testID?: string };
 
-export function SendButton({ onPress, disabled, accessibilityLabel = '发送' }: Props) {
+export function PlusButton({ onPress, accessibilityLabel = '添加附件', testID }: Props) {
   const { palette } = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
       accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      testID={testID}
       hitSlop={8}
       style={({ pressed }) => ({
         width: 32,
@@ -18,14 +19,10 @@ export function SendButton({ onPress, disabled, accessibilityLabel = '发送' }:
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: disabled
-          ? palette.surface2
-          : pressed
-            ? palette.primary2
-            : '#1A66FF',
+        opacity: pressed ? 0.55 : 1,
       })}
     >
-      <Icon name="send" size={20} color={disabled ? palette.fg3 : '#FFFFFF'} />
+      <Icon name="plus" size={20} color={palette.fg} />
     </Pressable>
   );
 }
