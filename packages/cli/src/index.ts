@@ -2,6 +2,7 @@
 
 import { startDaemon } from './daemon/server.js';
 import { DEFAULT_PORT, getDaemonStatePath } from './daemon/types.js';
+import { loadConfig } from './daemon/config.js';
 import { existsSync, readFileSync } from 'fs';
 
 function getStatus() {
@@ -74,7 +75,9 @@ Examples:
       const portArg = subArgs.findIndex((arg, i) => arg === '--port' && subArgs[i + 1]);
       const serverArg = subArgs.findIndex((arg, i) => arg === '--server' && subArgs[i + 1]);
       const port = portArg !== -1 ? parseInt(subArgs[portArg + 1], 10) : DEFAULT_PORT;
-      const serverUrl = serverArg !== -1 ? subArgs[serverArg + 1] : undefined;
+      // --server 缺省走 config.serverUrl；config 也缺省到 ws://localhost:19998
+      const config = loadConfig();
+      const serverUrl = serverArg !== -1 ? subArgs[serverArg + 1] : config.serverUrl;
       await startDaemon(port, serverUrl);
     } else if (action === 'stop') {
       await stopDaemon();

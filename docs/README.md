@@ -27,7 +27,7 @@ Uran 是一个基于 Claude Agent SDK 的会话管理守护进程，通过 Socke
 ## 项目结构
 
 ```
-uran/
+openz/
 ├── packages/
 │   ├── cli/          # 守护进程与 Agent 实现
 │   ├── shared/       # 共享类型定义

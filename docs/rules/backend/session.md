@@ -6,10 +6,10 @@
 
 ### 持久化
 
-会话元数据持久化到 `~/.uran/sessions.json`：
+会话元数据持久化到 `~/.openz/sessions.json`：
 
 ```typescript
-const SESSIONS_FILE = join(process.env.HOME || '/tmp', '.uran', 'sessions.json');
+const SESSIONS_FILE = join(process.env.HOME || '/tmp', '.openz', 'sessions.json');
 ```
 
 **注意**：`agentSession`（实际的 Agent 运行时）无法序列化重连，仅保存 `Session` 元数据。Daemon 重启后，已存会话的 `status` 会标记为 `disconnected`。

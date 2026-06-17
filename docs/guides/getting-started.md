@@ -30,9 +30,9 @@ DAEMON_PORT=20000 pnpm dev
 ```
 
 守护进程启动后：
-- 状态文件：`~/.uran/daemon.state.json`
-- 会话文件：`~/.uran/sessions.json`
-- 日志文件：`~/.uran/daemon.log`
+- 状态文件：`~/.openz/daemon.state.json`
+- 会话文件：`~/.openz/sessions.json`
+- 日志文件：`~/.openz/daemon.log`
 
 ## 启动 Web 前端
 
@@ -55,7 +55,7 @@ pnpm dev
 ## 项目结构
 
 ```
-uran/
+openz/
 ├── packages/
 │   ├── cli/          # 守护进程
 │   │   └── src/

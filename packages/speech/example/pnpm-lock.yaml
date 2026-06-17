@@ -8,9 +8,9 @@ importers:
 
   .:
     dependencies:
-      '@volc/sdk':
+      '@openz/speech':
         specifier: file:..
-        version: volc-speech-js-sdk@file:..
+        version: file:..
       dotenv:
         specifier: ^17.2.0
         version: 17.4.2
@@ -206,6 +206,9 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
+  '@openz/speech@file:..':
+    resolution: {directory: .., type: directory}
+
   '@tsconfig/node10@1.0.12':
     resolution: {integrity: sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==}
 
@@ -293,9 +296,6 @@ packages:
 
   v8-compile-cache-lib@3.0.1:
     resolution: {integrity: sha512-wa7YjyUGfNZngI/vtK0UHAN+lgDCxBPCylVXGp0zu59Fz5aiGtNXaq3DhIov063MorB+VfufLh3JlF2KdTK3xg==}
-
-  volc-speech-js-sdk@file:..:
-    resolution: {directory: .., type: directory}
 
   ws@8.21.0:
     resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
@@ -406,6 +406,14 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@openz/speech@file:..':
+    dependencies:
+      uuid: 11.1.1
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@tsconfig/node10@1.0.12': {}
 
   '@tsconfig/node12@1.0.11': {}
@@ -501,14 +509,6 @@ snapshots:
   uuid@11.1.1: {}
 
   v8-compile-cache-lib@3.0.1: {}
-
-  volc-speech-js-sdk@file:..:
-    dependencies:
-      uuid: 11.1.1
-      ws: 8.21.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
 
   ws@8.21.0: {}
 

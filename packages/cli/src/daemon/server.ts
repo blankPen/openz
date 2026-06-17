@@ -1,8 +1,6 @@
 import 'dotenv/config';
-import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
 import { createServer } from 'http';
-import WebSocket, { WebSocketServer } from 'ws';
 import { io, type Socket as ClientSocket } from 'socket.io-client';
 import { SessionManager } from './session.js';
 import { ClaudeAgent } from '../agents/claude.js';
@@ -11,7 +9,6 @@ import type {
   CreateSessionRequest,
   SendMessageRequest,
   SessionRequest,
-  SendVoiceReplyRequest,
   SessionCreatedResponse,
   SessionListResponse,
   SessionErrorResponse,
@@ -19,6 +16,7 @@ import type {
   AgentEvent,
 } from '@openz/shared';
 import { DEFAULT_PORT, getDaemonStatePath, type DaemonState } from './types.js';
+import { loadConfig } from './config.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 
@@ -41,8 +39,18 @@ function saveDaemonState(state: DaemonState) {
   writeFileSync(getDaemonStatePath(), JSON.stringify(state, null, 2));
 }
 
-// Active voice reply WebSocket connections, keyed by sessionId
-const voiceWsClients = new Map<string, WebSocket>();
+/**
+ * TTS 输出 sink 抽象。
+ * 不同模式下把 PCM 帧和控制事件写到不同的下游。
+ */
+export interface TtsSink {
+  /** 发送一帧 PCM 字节；返回 false 表示下游已关闭 */
+  sendAudio(frame: Buffer | Uint8Array): boolean;
+  /** 发送一条控制事件（first_frame / chunk / end / error） */
+  sendEvent(event: Record<string, any>): boolean;
+  /** 下游是否仍可写 */
+  isOpen(): boolean;
+}
 
 export async function startDaemon(port = DEFAULT_PORT, serverUrl?: string) {
   const daemonId = `daemon-${randomUUID().slice(0, 8)}`;
@@ -60,38 +68,6 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
   const httpServer = createServer();
   const io = new SocketIOServer(httpServer, {
     cors: { origin: '*' },
-  });
-
-  // WebSocket server for TTS PCM streaming (used by @openz/speech/client)
-  const wss = new WebSocketServer({ noServer: true });
-
-  // Handle WebSocket upgrade requests (TTS streaming)
-  wss.on('connection', (ws: WebSocket, sessionId: string) => {
-    log(`[WS] TTS client connected for session ${sessionId}`);
-    voiceWsClients.set(sessionId, ws);
-
-    ws.on('close', () => {
-      log(`[WS] TTS client disconnected for session ${sessionId}`);
-      voiceWsClients.delete(sessionId);
-    });
-
-    ws.on('error', (err) => {
-      log(`[WS] TTS client error for session ${sessionId}:`, err.message);
-      voiceWsClients.delete(sessionId);
-    });
-  });
-
-  // Attach WebSocket server to HTTP server upgrade handling
-  httpServer.on('upgrade', (request, socket, head) => {
-    const url = new URL(request.url || '', `http://${request.headers.host}`);
-    if (url.pathname === '/api/tts/ws') {
-      const sessionId = url.searchParams.get('sessionId') || '';
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, sessionId);
-      });
-    } else {
-      socket.destroy();
-    }
   });
 
   const agent = new ClaudeAgent();
@@ -166,149 +142,6 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
       }
     });
 
-    // session:voice_reply — 使用 @openz/speech/server bidirectionTtsStream
-    socket.on('session:voice_reply', async (req: SendVoiceReplyRequest, ack) => {
-      log('session:voice_reply', req);
-      try {
-        const entry = sessionManager.getSession(req.sessionId);
-        if (!entry) {
-          ack?.({ error: `Session ${req.sessionId} not found` });
-          return;
-        }
-
-        const sessionId = req.sessionId;
-        const ws = voiceWsClients.get(sessionId);
-
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-          ack?.({ error: `No TTS WebSocket connection for session ${sessionId}` });
-          return;
-        }
-
-        const wsClient = ws;
-
-        const textQueue: string[] = [];
-        let resolveNextChunk: ((chunk: string) => void) | null = null;
-        let ttsDone = false;
-
-        async function* textStream(): AsyncGenerator<string> {
-          while (!ttsDone || textQueue.length > 0) {
-            if (textQueue.length > 0) {
-              yield textQueue.shift()!;
-              continue;
-            }
-            // queue 空：挂起等待下一个 text_delta 或 turn_done 唤醒。
-            // 这里把 Promise resolve 传回来的值（resolveNextChunk 接收的 chunk）
-            // 存进 resolved 并 yield 出去——之前的实现里这个值被 await 默默
-            // 丢弃，导致每个 text_delta 的首段永远到不了火山，火山收到残缺
-            // 文本返回 0 帧。
-            const resolved = await new Promise<string>((resolve) => {
-              resolveNextChunk = resolve;
-            });
-            if (resolved) {
-              yield resolved;
-            }
-          }
-        }
-
-        const handleEvent = (event: AgentEvent) => {
-          if (event.type === 'text_delta') {
-            const text = event.data.text;
-            const sentences = text.match(/[^.。!！?？\n]+[.。!！?？\n]*/g);
-            if (sentences) {
-              for (const sentence of sentences) {
-                const trimmed = sentence.trim();
-                if (!trimmed) continue;
-                if (resolveNextChunk) {
-                  resolveNextChunk(trimmed);
-                  resolveNextChunk = null;
-                } else {
-                  textQueue.push(trimmed);
-                }
-              }
-            }
-          }
-
-          if (event.type === 'turn_done' || event.type === 'assistant_complete') {
-            ttsDone = true;
-            // 之前是 textQueue.shift() 取第一项经 resolveNextChunk 传出去——
-            // 但这样会把 queue 里剩余项也丢掉，且 turn_done 时多半 textStream
-            // 还在走 queue 分支（resolveNextChunk=null）这条分支根本不会执行。
-            // 改成无条件唤醒：resolved='' 是"自然结束"信号，textStream 醒来
-            // 后会继续走 while 循环把 queue 里所有剩余 chunk 排空，然后
-            // ttsDone=true + queue 空 → 退出。
-            if (resolveNextChunk) {
-              resolveNextChunk('');
-              resolveNextChunk = null;
-            }
-          }
-
-          const response: SessionEventResponse = { sessionId, event };
-          socket.emit('session:event', response);
-        };
-
-        sessionManager.setOnEvent(sessionId, handleEvent);
-        sessionManager.updateSessionStatus(sessionId, 'running');
-
-        const startedAt = Date.now();
-
-        async function runTtsStream() {
-          try {
-            const stream = bidirectionTtsStream({
-              appkey: process.env.VOLCENGINE_API_KEY || '',
-              resourceId: 'seed-tts-2.0',
-              voiceType: 'saturn_zh_female_aojiaonvyou_tob',
-              texts: textStream(),
-              encoding: 'pcm',
-              sampleRate: DEFAULT_SAMPLE_RATE,
-              onAudioFrame: (frame) => {
-                if (wsClient.readyState === WebSocket.OPEN) {
-                  wsClient.send(frame);
-                }
-              },
-              onFirstFrame: (at) => {
-                log(`[TTS] first frame +${at}ms for session ${sessionId}`);
-                if (wsClient.readyState === WebSocket.OPEN) {
-                  wsClient.send(JSON.stringify({ type: 'first_frame', at }));
-                }
-              },
-              onChunk: (idx, text) => {
-                log(`[TTS] chunk #${idx}: "${text.slice(0, 20)}..."`);
-                if (wsClient.readyState === WebSocket.OPEN) {
-                  wsClient.send(JSON.stringify({ type: 'chunk', index: idx, text, at: Date.now() - startedAt }));
-                }
-              },
-            });
-
-            await new Promise<void>((resolve, reject) => {
-              stream.on('end', resolve);
-              stream.on('error', reject);
-            });
-
-            if (wsClient.readyState === WebSocket.OPEN) {
-              wsClient.send(JSON.stringify({ type: 'end', totalBytes: 0 }));
-              wsClient.close();
-            }
-          } catch (err) {
-            log('[TTS] stream error:', err);
-            if (wsClient.readyState === WebSocket.OPEN) {
-              wsClient.send(JSON.stringify({ type: 'error', error: String(err) }));
-              wsClient.close();
-            }
-          }
-        }
-
-        sessionManager.sendMessage(sessionId, req.message).catch((err) => {
-          log('[TTS] sendMessage error:', err);
-        });
-
-        runTtsStream();
-
-        ack?.({ ok: true });
-      } catch (err: any) {
-        ack?.({ error: err.message });
-      }
-    });
-
     socket.on('session:interrupt', (req: SessionRequest, ack) => {
       sessionManager.interruptSession(req.sessionId);
       sessionManager.updateSessionStatus(req.sessionId, 'interrupted');
@@ -339,15 +172,160 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
 
   httpServer.listen(port, () => {
     console.log(`Openz daemon listening on http://localhost:${port}`);
-    console.log(`TTS WebSocket endpoint: ws://localhost:${port}/api/tts/ws?sessionId=<sessionId>`);
+    console.log('(voice reply requires relay mode; restart with --server <url>)');
   });
 
   process.on('SIGINT', () => {
     console.log('\nShutting down...');
     io.close();
-    wss.close();
     httpServer.close();
     process.exit(0);
+  });
+}
+
+/**
+ * 启动一次 TTS 流：把 agent 文本增量喂给 volcengine bidirectionTtsStream，
+ * 把返回的 PCM 帧和控制事件写到 sink。文本端通过 generator 推送给 volcengine。
+ *
+ * @param onEvent - 可选的事件转发钩子。TTS 流程只把 onEvent 用来喂文本给 volcengine，
+ *                  但 web 端还需要看到完整事件流渲染 UI；调用方传一个把事件 emit 到
+ *                  server（→ web）的回调进来，否则页面会"听得到声音但看不到文字"。
+ */
+function runTtsStream(
+  sessionId: string,
+  message: string,
+  sessionManager: SessionManager,
+  sink: TtsSink,
+  onEvent?: (event: AgentEvent) => void,
+): void {
+  const textQueue: string[] = [];
+  let resolveNextChunk: ((chunk: string) => void) | null = null;
+  let ttsDone = false;
+
+  async function* textStream(): AsyncGenerator<string> {
+    while (!ttsDone || textQueue.length > 0) {
+      if (textQueue.length > 0) {
+        yield textQueue.shift()!;
+        continue;
+      }
+      // queue 空：挂起等待下一个 text_delta 或 turn_done 唤醒。
+      // 这里把 Promise resolve 传回来的值（resolveNextChunk 接收的 chunk）
+      // 存进 resolved 并 yield 出去——之前的实现里这个值被 await 默默
+      // 丢弃，导致每个 text_delta 的首段永远到不了火山，火山收到残缺
+      // 文本返回 0 帧。
+      const resolved = await new Promise<string>((resolve) => {
+        resolveNextChunk = resolve;
+      });
+      if (resolved) {
+        yield resolved;
+      }
+    }
+  }
+
+  const handleEvent = (event: AgentEvent) => {
+    // 先把事件转发给调用方（一般是 emit 给 server → web 显示 UI）
+    onEvent?.(event);
+
+    // 再做 TTS 特有的处理：text_delta 喂 volcengine，turn_done 收尾
+    if (event.type === 'text_delta') {
+      const text = event.data.text;
+      const sentences = text.match(/[^.。!！?？\n]+[.。!！?？\n]*/g);
+      if (sentences) {
+        for (const sentence of sentences) {
+          const trimmed = sentence.trim();
+          if (!trimmed) continue;
+          if (resolveNextChunk) {
+            resolveNextChunk(trimmed);
+            resolveNextChunk = null;
+          } else {
+            textQueue.push(trimmed);
+          }
+        }
+      }
+    }
+
+    if (event.type === 'turn_done' || event.type === 'assistant_complete') {
+      ttsDone = true;
+      // 之前是 textQueue.shift() 取第一项经 resolveNextChunk 传出去——但
+      // 这样会把 queue 里的剩余项也丢掉，且 turn_done 时没有人在等
+      // resolveNextChunk（textStream 多半已在走 queue 分支）这条分支根本
+      // 不会执行。改成无条件唤醒：resolved='' 是"自然结束"信号，
+      // textStream 醒后会继续走 while 循环把 queue 里所有剩余 chunk
+      // 排空，然后 ttsDone=true + queue 空 → 退出。
+      if (resolveNextChunk) {
+        resolveNextChunk('');
+        resolveNextChunk = null;
+      }
+    }
+  };
+
+  sessionManager.setOnEvent(sessionId, handleEvent);
+  sessionManager.updateSessionStatus(sessionId, 'running');
+
+  const startedAt = Date.now();
+
+  (async () => {
+    try {
+      const config = loadConfig();
+      // 关键：bidirectionTtsStream 内部会覆盖 onAudioFrame（改成把帧 push 到
+      // 返回的 Readable），所以我们必须从 stream.on('data') 读音频帧。
+      // onFirstFrame / onChunk 没被覆盖，照常传 callback 即可。
+      const stream = bidirectionTtsStream({
+        appkey: config.tts.appkey,
+        resourceId: config.tts.resourceId,
+        voiceType: config.tts.voiceType,
+        texts: textStream(),
+        encoding: (config.tts.encoding as any) || 'pcm',
+        sampleRate: config.tts.sampleRate || DEFAULT_SAMPLE_RATE,
+        onFirstFrame: (at) => {
+          log(`[TTS] first frame +${at}ms for session ${sessionId}`);
+          if (sink.isOpen()) sink.sendEvent({ type: 'first_frame', at });
+        },
+        onChunk: (idx, text) => {
+          log(`[TTS] chunk #${idx}: "${text.slice(0, 20)}..."`);
+          if (sink.isOpen()) {
+            sink.sendEvent({ type: 'chunk', index: idx, text, at: Date.now() - startedAt });
+          }
+        },
+      });
+
+      let frameCount = 0;
+      let totalBytes = 0;
+      stream.on('data', (frame: Buffer) => {
+        if (!sink.isOpen()) return;
+        frameCount++;
+        totalBytes += frame.length;
+        if (frameCount <= 3 || frameCount % 50 === 0) {
+          log(`[TTS] audio frame #${frameCount} ${frame.length}B (total ${totalBytes}B)`);
+        }
+        sink.sendAudio(frame);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        stream.on('end', () => {
+          log(`[TTS] stream end, ${frameCount} frames, ${totalBytes} bytes total`);
+          resolve();
+        });
+        stream.on('error', (err) => {
+          log('[TTS] stream error:', err);
+          reject(err);
+        });
+      });
+
+      if (sink.isOpen()) {
+        sink.sendEvent({ type: 'end', totalBytes });
+      }
+    } catch (err) {
+      log('[TTS] stream error:', err);
+      if (sink.isOpen()) {
+        sink.sendEvent({ type: 'error', error: String(err) });
+      }
+    }
+  })();
+
+  // 同步发起 agent 调用；textStream 会在 TTS 内部拉取
+  sessionManager.sendMessage(sessionId, message).catch((err) => {
+    log('[TTS] sendMessage error:', err);
   });
 }
 
@@ -375,6 +353,18 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
     log(`Connected to Openz Server: ${serverUrl}`);
     console.log(`Openz daemon connected to server: ${serverUrl}`);
     socket.emit('daemon:register', { daemonId });
+
+    // 上报本地已加载的 session，让 server 建立 session→daemon 映射。
+    // 这条必不可少：每次重启 daemon 都会生成新的 daemonId（随机），
+    // 不上报的话 server 端从磁盘恢复不出 session，session:send / tts:start 都会 404。
+    const loaded = sessionManager.getAllSessions();
+    if (loaded.length > 0) {
+      socket.emit('daemon:sessions', {
+        daemonId,
+        sessions: loaded.map((s) => ({ sessionId: s.id, session: s })),
+      });
+      log(`Reported ${loaded.length} loaded sessions to server`);
+    }
   });
 
   socket.on('daemon:registered', (data: { daemonId: string }) => {
@@ -429,6 +419,47 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
       });
 
       await sessionManager.sendMessage(req.sessionId, req.message);
+      ack?.({ ok: true });
+    } catch (err: any) {
+      ack?.({ error: err.message });
+    }
+  });
+
+  // daemon:tts_start — 服务端转发的语音合成请求
+  socket.on('daemon:tts_start', (req: { sessionId: string; message: string }, ack?: (r: any) => void) => {
+    log('daemon:tts_start (relay)', req);
+    try {
+      const entry = sessionManager.getSession(req.sessionId);
+      if (!entry) {
+        ack?.({ error: `Session ${req.sessionId} not found` });
+        return;
+      }
+
+      const sessionId = req.sessionId;
+      const sink: TtsSink = {
+        isOpen: () => socket.connected,
+        sendAudio: (frame) => {
+          if (!socket.connected) return false;
+          // 第一个参数是事件名，第二是二进制 buffer，附带的元数据放在 ack 后的对象里
+          // socket.io v4 支持 Buffer 作为 binary frame
+          socket.emit('daemon:tts_audio', { sessionId }, frame);
+          return true;
+        },
+        sendEvent: (event) => {
+          if (!socket.connected) return false;
+          socket.emit('daemon:tts_event', { sessionId, ...event });
+          return true;
+        },
+      };
+
+      // 同时把 agent 的事件转发到 server（→ web），让 UI 也能渲染文字。
+      // 没这层的话 runTtsStream 内部的 onEvent 只喂火山，web 端"听得到看不到"。
+      const forwardEvent = (event: AgentEvent) => {
+        if (!socket.connected) return;
+        socket.emit('daemon:session_event', { sessionId, event });
+      };
+
+      runTtsStream(sessionId, req.message, sessionManager, sink, forwardEvent);
       ack?.({ ok: true });
     } catch (err: any) {
       ack?.({ error: err.message });

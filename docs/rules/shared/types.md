@@ -122,7 +122,7 @@ interface SessionEventResponse {
 生成 UUID 作为 session ID：
 
 ```typescript
-import { generateSessionId } from '@uran/shared';
+import { generateSessionId } from '@openz/shared';
 
 const id = generateSessionId(); // e.g. "a1b2c3d4-..."
 ```

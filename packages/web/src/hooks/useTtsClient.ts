@@ -1,16 +1,18 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { PCMPlayer, TtsClient } from '@openz/speech/client';
-import type {
-  SessionStartInfo,
-  ChunkInfo,
-  EndInfo,
-} from '@openz/speech/client';
+import { PCMPlayer } from '@openz/speech/client';
+import { socket } from '../socket';
 
-const DAEMON_PORT = 19999;
-
+/**
+ * TTS 客户端 hook。
+ *
+ * 通过已有的 socket.io 连接（server 中继）接收 PCM 帧和控制事件，
+ * 不再走裸 WebSocket 也不再硬编码 daemon 端口。
+ *
+ * server 端 tts:audio 是二进制帧（PCM Int16 LE），直接喂给 PCMPlayer 播放。
+ */
 export function useTtsClient() {
   const pcmPlayerRef = useRef<PCMPlayer | null>(null);
-  const ttsClientRef = useRef<TtsClient | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
 
   const ensurePlayer = useCallback(() => {
     if (!pcmPlayerRef.current) {
@@ -25,55 +27,81 @@ export function useTtsClient() {
     return pcmPlayerRef.current;
   }, []);
 
+  // 过滤：只处理当前活跃 session 的事件
+  const onTtsEvent = useCallback(
+    (data: { sessionId: string; type: string; [k: string]: any }) => {
+      if (data.sessionId !== activeSessionIdRef.current) return;
+      switch (data.type) {
+        case 'session_start':
+          console.log('[TtsClient] session_start:', data);
+          break;
+        case 'chunk':
+          console.log(
+            `[TtsClient] chunk #${data.index}: "${(data.text || '').slice(0, 20)}..."`,
+          );
+          break;
+        case 'first_frame':
+          console.log(`[TtsClient] first_frame +${data.at}ms`);
+          break;
+        case 'end':
+          console.log(`[TtsClient] end: ${data.totalBytes} bytes`);
+          break;
+        case 'error':
+          console.error('[TtsClient] error:', data.error);
+          break;
+      }
+    },
+    [],
+  );
+
+  const onTtsAudio = useCallback(
+    (meta: { sessionId: string }, buffer: ArrayBuffer | Uint8Array) => {
+      if (meta.sessionId !== activeSessionIdRef.current) return;
+      const player = ensurePlayer();
+      const bytes = buffer instanceof Uint8Array ? buffer.byteLength : buffer.byteLength;
+      console.log(`[TtsClient] tts:audio received: ${bytes} bytes, feeding PCMPlayer`);
+      player.feed(buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer));
+    },
+    [ensurePlayer],
+  );
+
+  useEffect(() => {
+    socket.on('tts:event', onTtsEvent);
+    socket.on('tts:audio', onTtsAudio);
+    return () => {
+      socket.off('tts:event', onTtsEvent);
+      socket.off('tts:audio', onTtsAudio);
+    };
+  }, [onTtsEvent, onTtsAudio]);
+
   const connect = useCallback((sessionId: string, message: string) => {
+    activeSessionIdRef.current = sessionId;
+    // 防御性 resume：浏览器 autoplay policy 要求 AudioContext 在用户手势
+    // 调用栈里 resume 才会出声。connect 通常在 send 点击后被调用，
+    // 但中间可能跨过 async 边界丢失手势上下文；这里再调一次保险。
     const player = ensurePlayer();
-
-    if (ttsClientRef.current) {
-      ttsClientRef.current.stop();
-      ttsClientRef.current = null;
+    const ctx = (player as any).audioCtx as AudioContext | undefined;
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {
+        /* 仍不在手势上下文里，等到 TTS 真正开始时再试 */
+      });
     }
-
-    const wsUrl = `ws://${window.location.hostname}:${DAEMON_PORT}/api/tts/ws?sessionId=${encodeURIComponent(sessionId)}`;
-
-    const client = new TtsClient({
-      url: wsUrl,
-      text: message,
-      voiceType: 'saturn_zh_female_aojiaonvyou_tob',
-      resourceId: 'seed-tts-2.0',
-      simulateStream: false,
-      onSessionStart: (info: SessionStartInfo) => {
-        console.log('[TtsClient] session_start:', info);
+    socket.emit(
+      'tts:start',
+      { sessionId, message },
+      (res: { ok?: boolean; error?: string }) => {
+        if (res?.error) {
+          console.error('[TtsClient] tts:start error:', res.error);
+          if (activeSessionIdRef.current === sessionId) {
+            activeSessionIdRef.current = null;
+          }
+        }
       },
-      onChunk: (info: ChunkInfo) => {
-        console.log(`[TtsClient] chunk #${info.index}: "${info.text.slice(0, 20)}..."`);
-      },
-      onFirstFrame: (at: number) => {
-        console.log(`[TtsClient] first_frame +${at}ms`);
-      },
-      onAudioFrame: (data: ArrayBuffer) => {
-        player.feed(new Uint8Array(data));
-      },
-      onEnd: (info: EndInfo) => {
-        console.log(`[TtsClient] end: ${info.totalFrames} frames, ${info.totalBytes} bytes`);
-      },
-      onError: (msg: string) => {
-        console.error('[TtsClient] error:', msg);
-      },
-      onClose: () => {
-        console.log('[TtsClient] closed');
-        ttsClientRef.current = null;
-      },
-    });
-
-    ttsClientRef.current = client;
-    client.start();
+    );
   }, [ensurePlayer]);
 
   const disconnect = useCallback(() => {
-    if (ttsClientRef.current) {
-      ttsClientRef.current.stop();
-      ttsClientRef.current = null;
-    }
+    activeSessionIdRef.current = null;
   }, []);
 
   const destroy = useCallback(() => {
@@ -86,10 +114,7 @@ export function useTtsClient() {
 
   useEffect(() => {
     return () => {
-      if (ttsClientRef.current) {
-        ttsClientRef.current.stop();
-        ttsClientRef.current = null;
-      }
+      activeSessionIdRef.current = null;
       if (pcmPlayerRef.current) {
         pcmPlayerRef.current.destroy();
         pcmPlayerRef.current = null;

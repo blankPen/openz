@@ -172,10 +172,10 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
     // Stop any playing audio and disconnect existing TTS session
     disconnectTts();
 
-    const eventName = voiceReplyEnabled ? 'session:voice_reply' : 'session:send';
+    const eventName = voiceReplyEnabled ? 'tts:start' : 'session:send';
 
-    // For voice reply, establish WebSocket connection to daemon TTS endpoint first
-    // so PCM frames can arrive as soon as the daemon starts streaming
+    // For voice reply, register the TTS listener first so PCM frames arriving
+    // from the server can be fed to the player as soon as streaming starts.
     if (voiceReplyEnabled) {
       connectTts(sessionId, text);
     }

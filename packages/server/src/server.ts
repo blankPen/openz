@@ -1,4 +1,3 @@
-import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
@@ -46,8 +45,8 @@ const clientSessions = new Map<string, Set<string>>();
 // Track socket metadata
 const socketMeta = new Map<string, { lastHeartbeat: number; type: 'daemon' | 'client' }>();
 
-// Round-robin counter for daemon selection
-let roundRobinIndex = 0;
+// Round-robin counter for daemon selection (reserved for future use)
+// let roundRobinIndex = 0;
 
 /**
  * Logs a message with timestamp to stdout and daemon log file.
@@ -155,6 +154,45 @@ function getAvailableDaemon(): [string, DaemonInfo] | null {
   }
 
   return selected;
+}
+
+/**
+ * Collects the IDs of all client sockets subscribed to a given session.
+ * Used to fan out per-session events (e.g. TTS audio / control) to the right clients.
+ * @param sessionId - The session ID to look up.
+ * @returns Array of client socket IDs subscribed to this session.
+ */
+function collectSubscribedClientIds(sessionId: string): string[] {
+  const ids: string[] = [];
+  for (const [clientId, sessions] of clientSessions.entries()) {
+    if (sessions.has(sessionId)) ids.push(clientId);
+  }
+  return ids;
+}
+
+/**
+ * 查找 session 对应的 daemonId，未注册时按发送方 socket 懒注册。
+ *
+ * 之所以需要懒注册：daemon 重启后会生成新的 daemonId（随机），
+ * 磁盘上记录的旧 daemonId 无法匹配。daemon connect 时会上报已加载的
+ * sessions（daemon:sessions），但存在网络竞争：web 端可能先发出
+ * session:send / tts:start，server 此时还没收到 daemon:sessions。
+ * 一旦 daemon 开始回传 session_event / tts_audio / tts_event，
+ * 由此函数兜底把 session 绑到当前发送方 daemon。
+ */
+function resolveOrRegisterDaemonId(sessionId: string, fromSocket: Socket): string | null {
+  const known = sessionDaemonMap.get(sessionId);
+  if (known) return known;
+
+  for (const [daemonId, daemon] of daemons.entries()) {
+    if (daemon.socket.id === fromSocket.id) {
+      sessionDaemonMap.set(sessionId, daemonId);
+      daemon.sessions.add(sessionId);
+      log(`Lazy-registered session ${sessionId} to daemon ${daemonId}`);
+      return daemonId;
+    }
+  }
+  return null;
 }
 
 /**
@@ -283,9 +321,37 @@ export async function startServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Daemon 上报本地已加载的 session（connect 时一次性发送）
+    socket.on('daemon:sessions', (data: { daemonId: string; sessions: Array<{ sessionId: string; session?: any }> }) => {
+      const daemon = daemons.get(data.daemonId);
+      if (!daemon) {
+        log(`daemon:sessions from unknown daemon ${data.daemonId}, ignored`);
+        return;
+      }
+      let registered = 0;
+      for (const { sessionId, session } of data.sessions) {
+        if (sessionDaemonMap.has(sessionId)) continue;
+        sessionDaemonMap.set(sessionId, data.daemonId);
+        daemon.sessions.add(sessionId);
+        if (session) {
+          addSessionToDisk({
+            id: sessionId,
+            daemonId: data.daemonId,
+            status: session.status || 'idle',
+            engine: session.engine || 'claude',
+            cwd: session.cwd || '',
+            createdAt: session.createdAt || Date.now(),
+            lastActivity: Date.now(),
+          });
+        }
+        registered++;
+      }
+      log(`daemon:sessions: registered ${registered} new sessions for ${data.daemonId}`);
+    });
+
     // Daemon sends session event to relay to client
     socket.on('daemon:session_event', (data: { sessionId: string; event: any }) => {
-      const daemonId = sessionDaemonMap.get(data.sessionId);
+      const daemonId = resolveOrRegisterDaemonId(data.sessionId, socket);
       if (daemonId) {
         io.emit('session:event', {
           sessionId: data.sessionId,
@@ -296,6 +362,28 @@ export async function startServer(port = DEFAULT_PORT) {
         if (data.event.type === 'session_init' || data.event.type === 'message_start') {
           updateSessionOnDisk(data.sessionId, { status: 'running' });
         }
+      }
+    });
+
+    // Daemon forwards TTS PCM frame (binary) to subscribed web clients
+    socket.on('daemon:tts_audio', (meta: { sessionId: string }, buffer: Buffer) => {
+      const daemonId = resolveOrRegisterDaemonId(meta.sessionId, socket);
+      if (!daemonId) return;
+      const subscribed = collectSubscribedClientIds(meta.sessionId);
+      if (subscribed.length === 0) return;
+      for (const clientId of subscribed) {
+        io.to(clientId).emit('tts:audio', { sessionId: meta.sessionId }, buffer);
+      }
+    });
+
+    // Daemon forwards TTS control event (first_frame / chunk / end / error)
+    socket.on('daemon:tts_event', (data: { sessionId: string; type: string; [k: string]: any }) => {
+      const daemonId = resolveOrRegisterDaemonId(data.sessionId, socket);
+      if (!daemonId) return;
+      const subscribed = collectSubscribedClientIds(data.sessionId);
+      if (subscribed.length === 0) return;
+      for (const clientId of subscribed) {
+        io.to(clientId).emit('tts:event', data);
       }
     });
 
@@ -438,6 +526,28 @@ export async function startServer(port = DEFAULT_PORT) {
         removeSessionFromDisk(data.sessionId);
         ack?.({ error: 'Session not found' });
       }
+    });
+
+    // Client requests voice reply — forward to daemon owning the session
+    socket.on('tts:start', (data: { sessionId: string; message: string }, ack) => {
+      log(`Client requesting tts:start for session ${data.sessionId}`);
+      const daemonId = sessionDaemonMap.get(data.sessionId);
+      const daemon = daemonId ? daemons.get(daemonId) : null;
+
+      if (!daemon) {
+        ack?.({ error: `Session ${data.sessionId} not found or daemon unavailable` });
+        return;
+      }
+
+      // Make sure the requesting client is in the subscription set so it receives
+      // the daemon's tts:audio / tts:event fan-out.
+      const set = clientSessions.get(socket.id) || new Set<string>();
+      set.add(data.sessionId);
+      clientSessions.set(socket.id, set);
+
+      daemon.socket.emit('daemon:tts_start', data, (response: any) => {
+        ack?.(response);
+      });
     });
 
     // Handle disconnection

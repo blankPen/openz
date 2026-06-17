@@ -98,6 +98,16 @@ export class PCMPlayer {
     if (this.option.volume !== undefined) {
       this.gainNode.gain.value = this.option.volume
     }
+    console.log(`[PCMPlayer] init: state=${this.audioCtx.state} sampleRate=${this.audioCtx.sampleRate}Hz`)
+    // 浏览器 autoplay policy：AudioContext 默认是 suspended，
+    // 必须在用户手势调用栈里调 resume() 才会真正出声。
+    // 在这里调一次，如果上下文是用户手势触发的就能直接起来；否则是 no-op，
+    // 消费方可以再调一次。
+    void this.audioCtx.resume().then(() => {
+      console.log(`[PCMPlayer] resume() done, state=${this.audioCtx.state}`)
+    }).catch((err) => {
+      console.warn(`[PCMPlayer] resume() rejected (state=${this.audioCtx.state}):`, err?.message)
+    })
   }
 
   private static isTypedArray(
@@ -174,6 +184,16 @@ export class PCMPlayer {
   private flush(): void {
     if (!this.samples || this.samples.length === 0) return
     const self = this
+    console.log(
+      `[PCMPlayer] flush: samples=${this.samples.length} ` +
+      `state=${this.audioCtx.state} currentTime=${this.audioCtx.currentTime.toFixed(2)}s`,
+    )
+    if (this.audioCtx.state === 'suspended') {
+      console.warn('[PCMPlayer] AudioContext is suspended, attempting resume()...')
+      void this.audioCtx.resume().then(() => {
+        console.log(`[PCMPlayer] late-resume state=${this.audioCtx.state}`)
+      })
+    }
     const bufferSource = this.audioCtx.createBufferSource()
     if (typeof this.option.onended === 'function') {
       bufferSource.onended = (event: Event) => {
