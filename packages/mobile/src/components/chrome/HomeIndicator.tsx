@@ -5,6 +5,7 @@ export function HomeIndicator() {
   const { palette } = useTheme();
   return (
     <View
+      testID="home-indicator"
       pointerEvents="none"
       style={{
         height: 34,

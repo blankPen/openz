@@ -118,17 +118,9 @@ describe('HomeScreen', () => {
   });
 
   it('home indicator renders', () => {
-    // HomeIndicator component is rendered in the tree
-    const { root } = render(<HomeScreen />, { wrapper }) as any;
-    // HomeIndicator renders a View with height:34 and pointerEvents:none
-    // containing an inner View with width:134, height:5
-    const allViews = root.findAllByType('RCTView');
-    const homeIndicatorViews = allViews.filter((v: any) => {
-      const style = v.props.style || [];
-      const styleArr = Array.isArray(style) ? style : [style];
-      return styleArr.some((s: any) => s && s.height === 34);
-    });
-    expect(homeIndicatorViews.length).toBeGreaterThan(0);
+    // HomeIndicator component renders with testID
+    const { getByTestId } = render(<HomeScreen />, { wrapper });
+    expect(getByTestId('home-indicator')).toBeTruthy();
   });
 
   // S5: SettingsDrawer design spec
