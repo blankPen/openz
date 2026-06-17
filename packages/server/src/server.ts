@@ -10,7 +10,9 @@ const HEARTBEAT_TIMEOUT = 90000; // 90 seconds - daemon considered dead after 3 
 const SESSIONS_DIR = `${process.env.HOME}/.openz`;
 const SESSIONS_FILE = join(SESSIONS_DIR, 'sessions.json');
 
-// Session state stored on disk
+/**
+ * Session state persisted to disk for recovery after server restart.
+ */
 interface SessionState {
   id: string;
   daemonId: string;
@@ -21,7 +23,9 @@ interface SessionState {
   lastActivity: number;
 }
 
-// Connected daemons registry
+/**
+ * Registry entry for a connected daemon.
+ */
 interface DaemonInfo {
   socket: Socket;
   capabilities: string[];
@@ -29,6 +33,8 @@ interface DaemonInfo {
   lastHeartbeat: number;
   sessionIndex: number;
 }
+
+// Connected daemons registry
 const daemons = new Map<string, DaemonInfo>();
 
 // Session to daemon mapping
@@ -43,18 +49,28 @@ const socketMeta = new Map<string, { lastHeartbeat: number; type: 'daemon' | 'cl
 // Round-robin counter for daemon selection
 let roundRobinIndex = 0;
 
+/**
+ * Logs a message with timestamp to stdout and daemon log file.
+ */
 function log(...args: any[]) {
   console.log(`[${new Date().toISOString()}]`, ...args);
 }
 
 // ============ Persistence ============
 
+/**
+ * Ensures the sessions directory exists.
+ */
 function ensureSessionsDir() {
   if (!existsSync(SESSIONS_DIR)) {
     mkdirSync(SESSIONS_DIR, { recursive: true });
   }
 }
 
+/**
+ * Loads all persisted sessions from disk.
+ * @returns Array of SessionState objects, empty array if none exist or on error.
+ */
 function loadSessions(): SessionState[] {
   try {
     if (existsSync(SESSIONS_FILE)) {
@@ -67,6 +83,10 @@ function loadSessions(): SessionState[] {
   return [];
 }
 
+/**
+ * Persists all sessions to disk.
+ * @param sessions - Array of SessionState to save.
+ */
 function saveSessions(sessions: SessionState[]) {
   try {
     ensureSessionsDir();
@@ -76,6 +96,11 @@ function saveSessions(sessions: SessionState[]) {
   }
 }
 
+/**
+ * Updates a specific session's data on disk.
+ * @param sessionId - ID of the session to update.
+ * @param updates - Partial fields to update.
+ */
 function updateSessionOnDisk(sessionId: string, updates: Partial<SessionState>) {
   const sessions = loadSessions();
   const index = sessions.findIndex(s => s.id === sessionId);
@@ -85,18 +110,31 @@ function updateSessionOnDisk(sessionId: string, updates: Partial<SessionState>) 
   }
 }
 
+/**
+ * Adds a new session to the persisted state.
+ * @param session - SessionState to add.
+ */
 function addSessionToDisk(session: SessionState) {
   const sessions = loadSessions();
   sessions.push(session);
   saveSessions(sessions);
 }
 
+/**
+ * Removes a session from the persisted state.
+ * @param sessionId - ID of the session to remove.
+ */
 function removeSessionFromDisk(sessionId: string) {
   const sessions = loadSessions();
   const filtered = sessions.filter(s => s.id !== sessionId);
   saveSessions(filtered);
 }
 
+/**
+ * Selects an available daemon using least-sessions-first strategy.
+ * Only considers daemons with active heartbeats (within HEARTBEAT_TIMEOUT).
+ * @returns Tuple of [daemonId, DaemonInfo] or null if no daemon available.
+ */
 function getAvailableDaemon(): [string, DaemonInfo] | null {
   const daemonEntries = Array.from(daemons.entries()).filter(([, d]) => {
     return Date.now() - d.lastHeartbeat < HEARTBEAT_TIMEOUT;
@@ -119,6 +157,12 @@ function getAvailableDaemon(): [string, DaemonInfo] | null {
   return selected;
 }
 
+/**
+ * Cleans up all sessions associated with a disconnected daemon.
+ * Marks sessions as disconnected and notifies clients.
+ * @param io - The Socket.IO server instance.
+ * @param daemonId - ID of the disconnected daemon.
+ */
 function cleanupDaemonSessions(io: SocketIOServer, daemonId: string) {
   const daemon = daemons.get(daemonId);
   if (daemon) {
@@ -126,6 +170,7 @@ function cleanupDaemonSessions(io: SocketIOServer, daemonId: string) {
       sessionDaemonMap.delete(sessionId);
       // Update disk - mark session as disconnected
       updateSessionOnDisk(sessionId, { status: 'disconnected' });
+      // Notify clients that session is gone
       io.emit('session:event', {
         sessionId,
         event: {
@@ -140,6 +185,13 @@ function cleanupDaemonSessions(io: SocketIOServer, daemonId: string) {
   log(`Daemon ${daemonId} cleaned up`);
 }
 
+/**
+ * Starts the Openz relay server.
+ * Accepts WebSocket connections from both clients and daemons.
+ * Routes messages between clients and daemons, manages session persistence.
+ *
+ * @param port - Port to listen on (default: 19998)
+ */
 export async function startServer(port = DEFAULT_PORT) {
   const httpServer = createServer();
   const io = new SocketIOServer(httpServer, {
@@ -152,7 +204,7 @@ export async function startServer(port = DEFAULT_PORT) {
   const persistedSessions = loadSessions();
   log(`Loaded ${persistedSessions.length} persisted sessions`);
 
-  // Heartbeat check loop
+  // Heartbeat check loop - pings daemons and disconnects stale ones
   const heartbeatInterval = setInterval(() => {
     const now = Date.now();
 
@@ -168,10 +220,12 @@ export async function startServer(port = DEFAULT_PORT) {
     }
   }, HEARTBEAT_INTERVAL);
 
+  // Handle incoming connections
   io.on('connection', (socket: Socket) => {
     log(`Connection: ${socket.id}`);
     socketMeta.set(socket.id, { lastHeartbeat: Date.now(), type: 'daemon' });
 
+    // Daemon registration
     socket.on('daemon:register', (data: { daemonId: string; capabilities?: string[] }) => {
       log(`Daemon registered: ${data.daemonId}`);
       daemons.set(data.daemonId, {
@@ -196,6 +250,7 @@ export async function startServer(port = DEFAULT_PORT) {
       log(`Restored ${daemonSessions.length} sessions for daemon ${data.daemonId}`);
     });
 
+    // Daemon heartbeat response
     socket.on('daemon:pong', (data: { timestamp: number }) => {
       const daemonEntry = Array.from(daemons.entries()).find(([, d]) => d.socket.id === socket.id);
       if (daemonEntry) {
@@ -204,6 +259,7 @@ export async function startServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Daemon announces a new session
     socket.on('daemon:session_created', (data: { daemonId: string; sessionId: string; session?: any }) => {
       const daemon = daemons.get(data.daemonId);
       if (daemon) {
@@ -227,6 +283,7 @@ export async function startServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Daemon sends session event to relay to client
     socket.on('daemon:session_event', (data: { sessionId: string; event: any }) => {
       const daemonId = sessionDaemonMap.get(data.sessionId);
       if (daemonId) {
@@ -242,6 +299,7 @@ export async function startServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Client heartbeat
     socket.on('client:ping', () => {
       const meta = socketMeta.get(socket.id);
       if (meta) {
@@ -250,6 +308,7 @@ export async function startServer(port = DEFAULT_PORT) {
       socket.emit('client:pong');
     });
 
+    // Client requests session creation - routed to available daemon
     socket.on('session:create', (data: any, ack) => {
       log(`Client requesting session:create`, data);
       socketMeta.set(socket.id, { lastHeartbeat: Date.now(), type: 'client' });
@@ -285,6 +344,7 @@ export async function startServer(port = DEFAULT_PORT) {
       });
     });
 
+    // Client sends message to session
     socket.on('session:send', (data: { sessionId: string; message: string }, ack) => {
       log(`Client sending to session: ${data.sessionId}`);
       const daemonId = sessionDaemonMap.get(data.sessionId);
@@ -300,6 +360,7 @@ export async function startServer(port = DEFAULT_PORT) {
       });
     });
 
+    // Client interrupts session
     socket.on('session:interrupt', (data: { sessionId: string }, ack) => {
       const daemonId = sessionDaemonMap.get(data.sessionId);
       const daemon = daemonId ? daemons.get(daemonId) : null;
@@ -314,6 +375,7 @@ export async function startServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Client stops session
     socket.on('session:stop', (data: { sessionId: string }, ack) => {
       const daemonId = sessionDaemonMap.get(data.sessionId);
       const daemon = daemonId ? daemons.get(daemonId) : null;
@@ -328,6 +390,7 @@ export async function startServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Client lists all sessions
     socket.on('session:list', (_, ack) => {
       const daemonEntries = Array.from(daemons.entries());
       const allSessions: any[] = [];
@@ -356,6 +419,7 @@ export async function startServer(port = DEFAULT_PORT) {
       });
     });
 
+    // Client deletes session
     socket.on('session:delete', (data: { sessionId: string }, ack) => {
       const daemonId = sessionDaemonMap.get(data.sessionId);
       const daemon = daemonId ? daemons.get(daemonId) : null;
@@ -376,6 +440,7 @@ export async function startServer(port = DEFAULT_PORT) {
       }
     });
 
+    // Handle disconnection
     socket.on('disconnect', () => {
       log(`Disconnected: ${socket.id}`);
       const meta = socketMeta.get(socket.id);
@@ -398,6 +463,7 @@ export async function startServer(port = DEFAULT_PORT) {
     log(`Openz Server listening on http://localhost:${port}`);
   });
 
+  // Graceful shutdown
   process.on('SIGINT', () => {
     log('Shutting down...');
     clearInterval(heartbeatInterval);
