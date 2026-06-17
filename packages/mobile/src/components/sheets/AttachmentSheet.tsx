@@ -20,10 +20,10 @@ type Entry = {
 };
 
 const ENTRIES: Entry[] = [
-  { icon: 'image', label: '本地图片', color: '#5856D6', bg: '#F0F0FF' },
-  { icon: 'file', label: '本地文件', color: '#34C759', bg: '#E6F7E6' },
-  { icon: 'camera', label: '拍照', color: '#FF9500', bg: '#FFF3E0' },
-  { icon: 'quote', label: '引用回复', color: '#1A66FF', bg: '#E6F0FF' },
+  { icon: 'image', label: '本地图片', color: '#1A66FF', bg: '#EAF1FF' },
+  { icon: 'file', label: '本地文件', color: '#FF7A45', bg: '#FFE8DB' },
+  { icon: 'camera', label: '拍照', color: '#34A853', bg: '#E1F4E9' },
+  { icon: 'quote', label: '引用回复', color: '#8B5CF6', bg: '#F0E7FE' },
 ];
 
 function EntryGrid() {
