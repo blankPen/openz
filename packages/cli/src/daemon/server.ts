@@ -194,13 +194,18 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
           while (!ttsDone || textQueue.length > 0) {
             if (textQueue.length > 0) {
               yield textQueue.shift()!;
-            } else {
-              await new Promise<string>((resolve) => {
-                resolveNextChunk = resolve;
-              });
-              if (textQueue.length > 0) {
-                yield textQueue.shift()!;
-              }
+              continue;
+            }
+            // queue 空：挂起等待下一个 text_delta 或 turn_done 唤醒。
+            // 这里把 Promise resolve 传回来的值（resolveNextChunk 接收的 chunk）
+            // 存进 resolved 并 yield 出去——之前的实现里这个值被 await 默默
+            // 丢弃，导致每个 text_delta 的首段永远到不了火山，火山收到残缺
+            // 文本返回 0 帧。
+            const resolved = await new Promise<string>((resolve) => {
+              resolveNextChunk = resolve;
+            });
+            if (resolved) {
+              yield resolved;
             }
           }
         }
@@ -225,9 +230,14 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
 
           if (event.type === 'turn_done' || event.type === 'assistant_complete') {
             ttsDone = true;
-            const remaining = textQueue.shift();
-            if (remaining && resolveNextChunk) {
-              resolveNextChunk(remaining);
+            // 之前是 textQueue.shift() 取第一项经 resolveNextChunk 传出去——
+            // 但这样会把 queue 里剩余项也丢掉，且 turn_done 时多半 textStream
+            // 还在走 queue 分支（resolveNextChunk=null）这条分支根本不会执行。
+            // 改成无条件唤醒：resolved='' 是"自然结束"信号，textStream 醒来
+            // 后会继续走 while 循环把 queue 里所有剩余 chunk 排空，然后
+            // ttsDone=true + queue 空 → 退出。
+            if (resolveNextChunk) {
+              resolveNextChunk('');
               resolveNextChunk = null;
             }
           }
