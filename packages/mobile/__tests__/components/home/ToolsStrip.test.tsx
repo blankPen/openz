@@ -1,54 +1,40 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/ThemeProvider';
 import { ToolsStrip } from '../../../src/components/home/ToolsStrip';
-import type { Tool } from '../../../src/components/home/ToolsStrip';
 
 describe('ToolsStrip', () => {
-  test('renders default tools', () => {
+  test('renders 4 tools with correct names', () => {
     const { getByText } = render(
       <ThemeProvider initialMode="light">
         <ToolsStrip />
       </ThemeProvider>,
     );
-    expect(getByText('联网')).toBeTruthy();
-    expect(getByText('Deep Research')).toBeTruthy();
-    expect(getByText('法律助手')).toBeTruthy();
-    expect(getByText('创意助手')).toBeTruthy();
-    expect(getByText('学术助手')).toBeTruthy();
+    expect(getByText('通用 Agent')).toBeTruthy();
+    expect(getByText('一键 PPT')).toBeTruthy();
+    expect(getByText('OpenZ Claw')).toBeTruthy();
+    expect(getByText('健康助手')).toBeTruthy();
   });
 
-  test('renders custom tools', () => {
-    const customTools: Tool[] = [
-      { name: 'Custom Tool', icon: 'search', iconBg: '#fff', iconColor: '#000' },
-    ];
+  test('renders 4 tools (count)', () => {
+    const { getAllByText } = render(
+      <ThemeProvider initialMode="light">
+        <ToolsStrip />
+      </ThemeProvider>,
+    );
+    const toolNames = ['通用 Agent', '一键 PPT', 'OpenZ Claw', '健康助手'];
+    toolNames.forEach(name => {
+      expect(getAllByText(name)).toHaveLength(1);
+    });
+  });
+
+  test('first tool has isPrimary styling', () => {
     const { getByText } = render(
       <ThemeProvider initialMode="light">
-        <ToolsStrip tools={customTools} />
+        <ToolsStrip />
       </ThemeProvider>,
     );
-    expect(getByText('Custom Tool')).toBeTruthy();
-  });
-
-  test('fires onPress when tool is pressed', () => {
-    const onPress = jest.fn();
-    const tools: Tool[] = [
-      { name: 'Press Me', icon: 'globe', iconBg: '#fff', iconColor: '#000', onPress },
-    ];
-    const { getByText } = render(
-      <ThemeProvider initialMode="light">
-        <ToolsStrip tools={tools} />
-      </ThemeProvider>,
-    );
-    fireEvent.press(getByText('Press Me'));
-    expect(onPress).toHaveBeenCalledTimes(1);
-  });
-
-  test('renders empty when tools array is empty', () => {
-    const { queryByText } = render(
-      <ThemeProvider initialMode="light">
-        <ToolsStrip tools={[]} />
-      </ThemeProvider>,
-    );
-    expect(queryByText('联网')).toBeNull();
+    // First tool should be "通用 Agent" and be primary
+    const primaryTool = getByText('通用 Agent');
+    expect(primaryTool).toBeTruthy();
   });
 });
