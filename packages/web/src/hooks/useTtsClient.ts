@@ -1,5 +1,10 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { PCMPlayer, TtsClient } from '@openz/speech/client';
+import type {
+  SessionStartInfo,
+  ChunkInfo,
+  EndInfo,
+} from '@openz/speech/client';
 
 const DAEMON_PORT = 19999;
 
@@ -23,7 +28,6 @@ export function useTtsClient() {
   const connect = useCallback((sessionId: string, message: string) => {
     const player = ensurePlayer();
 
-    // Disconnect existing client if any
     if (ttsClientRef.current) {
       ttsClientRef.current.stop();
       ttsClientRef.current = null;
@@ -37,23 +41,22 @@ export function useTtsClient() {
       voiceType: 'saturn_zh_female_aojiaonvyou_tob',
       resourceId: 'seed-tts-2.0',
       simulateStream: false,
-      onSessionStart: (info) => {
+      onSessionStart: (info: SessionStartInfo) => {
         console.log('[TtsClient] session_start:', info);
       },
-      onChunk: (info) => {
+      onChunk: (info: ChunkInfo) => {
         console.log(`[TtsClient] chunk #${info.index}: "${info.text.slice(0, 20)}..."`);
       },
-      onFirstFrame: (at) => {
+      onFirstFrame: (at: number) => {
         console.log(`[TtsClient] first_frame +${at}ms`);
       },
-      onAudioFrame: (data) => {
-        // data is ArrayBuffer of raw Int16 PCM bytes
+      onAudioFrame: (data: ArrayBuffer) => {
         player.feed(new Uint8Array(data));
       },
-      onEnd: (info) => {
+      onEnd: (info: EndInfo) => {
         console.log(`[TtsClient] end: ${info.totalFrames} frames, ${info.totalBytes} bytes`);
       },
-      onError: (msg) => {
+      onError: (msg: string) => {
         console.error('[TtsClient] error:', msg);
       },
       onClose: () => {
@@ -81,7 +84,6 @@ export function useTtsClient() {
     }
   }, [disconnect]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (ttsClientRef.current) {
