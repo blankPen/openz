@@ -32,6 +32,10 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
   const currentMessageId = useRef<string | null>(null);
   const agentTextRef = useRef<Record<string, string>>({});
   const thinkingTextRef = useRef<Record<string, string>>({});
+  // 同步重入锁:React state `sending` 在同步多次 send 调用之间会陈旧
+  // (35ms 间隔时第二次 send 仍读到 render 1 的 sending=false),
+  // 用 ref 强制同步检查,防止重复 emit tts:start / session:send。
+  const sendingRef = useRef(false);
   const { connect: connectTts, disconnect: disconnectTts } = useTtsClient();
 
   const handleEvent = useCallback((event: AgentEvent) => {
@@ -133,6 +137,7 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
       case 'assistant_complete':
       case 'turn_done': {
         setSending(false);
+        sendingRef.current = false;
         currentMessageId.current = null;
         thinkingTextRef.current = {};
         break;
@@ -143,6 +148,7 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
           { id: `error-${Date.now()}`, type: 'user', text: `Error: ${event.data.error}` },
         ]);
         setSending(false);
+        sendingRef.current = false;
         break;
       }
     }
@@ -151,7 +157,8 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
   useSessionEvents(sessionId, handleEvent, scrollRef);
 
   const send = async (text: string) => {
-    if (!text.trim() || sending) return;
+    if (!text.trim() || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
 
     // Add user message immediately
@@ -174,10 +181,11 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
 
     const eventName = voiceReplyEnabled ? 'tts:start' : 'session:send';
 
-    // For voice reply, register the TTS listener first so PCM frames arriving
-    // from the server can be fed to the player as soon as streaming starts.
+    // For voice reply, set activeSessionId (过滤 socket 上的 tts:event/tts:audio)
+    // + 防御性 resume AudioContext。emit tts:start 走下面的 socket.emit,
+    // 集中一处避免重复触发。
     if (voiceReplyEnabled) {
-      connectTts(sessionId, text);
+      connectTts(sessionId);
     }
 
     return new Promise<void>((resolve) => {
@@ -188,6 +196,7 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
             { id: `error-${Date.now()}`, type: 'user', text: `Error: ${res.error}` },
           ]);
           setSending(false);
+          sendingRef.current = false;
         }
         resolve();
       });

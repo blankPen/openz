@@ -74,11 +74,11 @@ export function useTtsClient() {
     };
   }, [onTtsEvent, onTtsAudio]);
 
-  const connect = useCallback((sessionId: string, message: string) => {
+  const connect = useCallback((sessionId: string) => {
+    // 仅设置 activeSessionId 过滤器 + 防御性 resume AudioContext。
+    // emit 'tts:start' 的责任交给调用方(ChatView.send),避免 ChatView
+    // 调 connectTts 后又自己 socket.emit('tts:start') 造成双触发。
     activeSessionIdRef.current = sessionId;
-    // 防御性 resume：浏览器 autoplay policy 要求 AudioContext 在用户手势
-    // 调用栈里 resume 才会出声。connect 通常在 send 点击后被调用，
-    // 但中间可能跨过 async 边界丢失手势上下文；这里再调一次保险。
     const player = ensurePlayer();
     const ctx = (player as any).audioCtx as AudioContext | undefined;
     if (ctx && ctx.state === 'suspended') {
@@ -86,18 +86,6 @@ export function useTtsClient() {
         /* 仍不在手势上下文里，等到 TTS 真正开始时再试 */
       });
     }
-    socket.emit(
-      'tts:start',
-      { sessionId, message },
-      (res: { ok?: boolean; error?: string }) => {
-        if (res?.error) {
-          console.error('[TtsClient] tts:start error:', res.error);
-          if (activeSessionIdRef.current === sessionId) {
-            activeSessionIdRef.current = null;
-          }
-        }
-      },
-    );
   }, [ensurePlayer]);
 
   const disconnect = useCallback(() => {
