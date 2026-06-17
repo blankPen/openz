@@ -196,7 +196,7 @@ export function HomeScreen() {
         onClose={closeModelSheet}
         testID="model-sheet"
       >
-        <SheetHeader title="选择模型" subtitle="不同模型擅长不同任务" />
+        <SheetHeader title="选择模型" />
         {MOCK_MODELS.map((model) => (
           <ModelOptionRow
             key={model.id}
@@ -214,7 +214,7 @@ export function HomeScreen() {
         onClose={closeAttachmentSheet}
         testID="attachment-sheet"
       >
-        <SheetHeader title="上传文件" subtitle="支持图片、文档、代码文件" />
+        <SheetHeader title="上传文件" />
         <FileCard name="test_image.png" path="/tmp/test.png" size="2.4 MB" />
       </BottomSheet>
     </View>

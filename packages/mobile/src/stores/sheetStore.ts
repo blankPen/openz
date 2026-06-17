@@ -22,6 +22,18 @@ const DEFAULTS: Persisted = {
 };
 
 type SheetState = Persisted & {
+  // drawer
+  drawerVisible: boolean;
+  setDrawerVisible: (v: boolean) => void;
+  // model sheet
+  modelSheetVisible: boolean;
+  openModelSheet: () => void;
+  closeModelSheet: () => void;
+  // attachment sheet
+  attachmentSheetVisible: boolean;
+  openAttachmentSheet: () => void;
+  closeAttachmentSheet: () => void;
+  // generic
   openSheet: (key: SheetKey) => void;
   closeSheet: () => void;
   getSheetMeta: (key: SheetKey) => SheetMeta;
@@ -29,6 +41,14 @@ type SheetState = Persisted & {
 
 export const useSheetStore = create<SheetState>((set) => ({
   ...DEFAULTS,
+  drawerVisible: false,
+  setDrawerVisible: (drawerVisible) => set({ drawerVisible }),
+  modelSheetVisible: false,
+  openModelSheet: () => set({ modelSheetVisible: true }),
+  closeModelSheet: () => set({ modelSheetVisible: false }),
+  attachmentSheetVisible: false,
+  openAttachmentSheet: () => set({ attachmentSheetVisible: true }),
+  closeAttachmentSheet: () => set({ attachmentSheetVisible: false }),
   openSheet: (key) => {
     set({ activeSheet: key });
   },
