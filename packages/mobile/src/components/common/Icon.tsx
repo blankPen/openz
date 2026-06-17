@@ -3,14 +3,15 @@ import Svg, { Circle, Line, Path, Polyline, Polygon, Rect } from 'react-native-s
 export type IconName =
   | 'burger' | 'arrowDown' | 'voice' | 'phone' | 'plus' | 'arrowUp'
   | 'mic' | 'sun' | 'image' | 'doc' | 'camera' | 'quote' | 'close'
-  | 'check' | 'chevDown' | 'send' | 'copy' | 'like' | 'regenerate' | 'share'
+  | 'check' | 'chevDown' | 'chevUp' | 'send' | 'copy' | 'like' | 'regenerate' | 'share'
   | 'flash' | 'cube' | 'globe' | 'web' | 'lawyer' | 'fire' | 'phd'
-  | 'help' | 'info' | 'sparkles' | 'bell' | 'gear' | 'logout' | 'textSize' | 'lang';
+  | 'help' | 'info' | 'sparkles' | 'bell' | 'gear' | 'logout' | 'textSize' | 'lang'
+  | 'menu' | 'model' | 'search' | 'file' | 'star' | 'chart';
 
-type Props = { name: IconName; size?: number; color: string };
+type Props = { name: IconName; size?: number; color: string; testID?: string };
 
-export function Icon({ name, size = 22, color }: Props) {
-  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+export function Icon({ name, size = 22, color, testID }: Props) {
+  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, testID };
   switch (name) {
     case 'burger': return <Svg {...props}><Line x1={4} y1={7} x2={20} y2={7} /><Line x1={4} y1={12} x2={20} y2={12} /><Line x1={4} y1={17} x2={20} y2={17} /></Svg>;
     case 'arrowDown': return <Svg {...props}><Polyline points="6 9 12 15 18 9" /></Svg>;
@@ -41,6 +42,13 @@ export function Icon({ name, size = 22, color }: Props) {
     case 'phd': return <Svg {...props}><Path d="M22 12h-4l-3 9L9 3l-3 9H2" /></Svg>;
     case 'help': return <Svg {...props}><Circle cx={12} cy={12} r={10} /><Path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" /><Line x1={12} y1={17} x2={12.01} y2={17} /></Svg>;
     case 'info': return <Svg {...props}><Circle cx={12} cy={12} r={10} /><Line x1={12} y1={16} x2={12} y2={12} /><Line x1={12} y1={8} x2={12.01} y2={8} /></Svg>;
+    case 'chevUp': return <Svg {...props}><Polyline points="6 15 12 9 18 15" /></Svg>;
+    case 'menu': return <Svg {...props}><Line x1={3} y1={6} x2={21} y2={6} /><Line x1={3} y1={12} x2={21} y2={12} /><Line x1={3} y1={18} x2={21} y2={18} /></Svg>;
+    case 'model': return <Svg {...props}><Rect x={3} y={3} width={8} height={8} rx={1} /><Rect x={8} y={8} width={8} height={8} rx={1} /><Rect x={13} y={13} width={8} height={8} rx={1} /></Svg>;
+    case 'search': return <Svg {...props}><Circle cx={11} cy={11} r={6} /><Line x1={21} y1={21} x2={16.65} y2={16.65} /></Svg>;
+    case 'file': return <Svg {...props}><Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><Polyline points="14 2 14 8 20 8" /><Line x1={9} y1={15} x2={15} y2={15} /></Svg>;
+    case 'star': return <Svg {...props} fill={color} stroke="none"><Polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></Svg>;
+    case 'chart': return <Svg {...props}><Line x1={18} y1={20} x2={18} y2={10} /><Line x1={12} y1={20} x2={12} y2={4} /><Line x1={6} y1={20} x2={6} y2={14} /></Svg>;
     case 'sparkles': return <Svg {...props} fill={color} stroke="none"><Path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z" /></Svg>;
     case 'bell': return <Svg {...props}><Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><Path d="M13.73 21a2 2 0 01-3.46 0" /></Svg>;
     case 'gear': return <Svg {...props}><Circle cx={12} cy={12} r={3} /><Path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" /></Svg>;
