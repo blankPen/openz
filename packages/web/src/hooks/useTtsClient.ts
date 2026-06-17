@@ -94,6 +94,10 @@ export function useTtsClient() {
 
   const disconnect = useCallback(() => {
     activeSessionIdRef.current = null;
+    // 清空 PCMPlayer 内部残留(samples + 活跃 BufferSource),避免新一次
+    // TTS 流的帧叠加到上一流的尾巴上导致音频重叠。AudioContext 保留,
+    // 下次 ensurePlayer 复用同一个 ctx。
+    pcmPlayerRef.current?.clear();
   }, []);
 
   const destroy = useCallback(() => {

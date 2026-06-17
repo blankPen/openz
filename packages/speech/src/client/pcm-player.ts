@@ -271,6 +271,24 @@ export class PCMPlayer {
     return this.playingFlag
   }
 
+  /**
+   * 清空内部状态但不关 AudioContext。
+   * 用于开始新一次 TTS 流前丢弃上一流的残留:
+   * - 停掉所有正在播的 BufferSource
+   * - 清空 samples 队列
+   * - 重置 startTime
+   * 保留 audioCtx / gain / analyser 节点,避免 autoplay policy 边界问题。
+   */
+  clear(): void {
+    for (const source of this.activeSources) {
+      try { source.stop() } catch { /* source 可能已经自然结束 */ }
+    }
+    this.activeSources.clear()
+    this.samples = new Float32Array()
+    this.startTime = null
+    this.setPlaying(false)
+  }
+
   private setPlaying(playing: boolean): void {
     if (this.playingFlag === playing) return
     this.playingFlag = playing
