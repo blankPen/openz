@@ -32,3 +32,6 @@ export interface SessionCreatedResponse { session: Session }
 export interface SessionListResponse { sessions: Session[] }
 export interface SessionErrorResponse { error: string }
 export interface SessionEventResponse { sessionId: string; event: AgentEvent }
+export interface TTSAudioResponse { data: string | null }
+export interface TTSErrorResponse { error: string }
+export interface TTSCompleteResponse {}

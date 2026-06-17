@@ -42,6 +42,11 @@ export interface SessionRequest {
   sessionId: string;
 }
 
+export interface SendVoiceReplyRequest {
+  sessionId: string;
+  message: string;
+}
+
 // Socket.IO 响应类型
 export interface SessionCreatedResponse {
   session: Session;

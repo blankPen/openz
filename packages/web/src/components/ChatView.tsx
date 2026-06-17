@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, type FormEvent } from 'react';
 import { socket } from '../socket';
 import { useSessionEvents } from '../hooks/useSocket';
+import { useTtsClient } from '../hooks/useTtsClient';
 import type { AgentEvent } from '../types';
 import { AgentMessage, ThinkingMessage, ToolUse, UserMessage } from './Message';
 
@@ -25,11 +26,13 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingToolId = useRef<string | null>(null);
   const currentMessageId = useRef<string | null>(null);
   const agentTextRef = useRef<Record<string, string>>({});
   const thinkingTextRef = useRef<Record<string, string>>({});
+  const { connect: connectTts, disconnect: disconnectTts } = useTtsClient();
 
   const handleEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
@@ -166,8 +169,19 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
       m => m.type !== 'agent' && m.type !== 'thinking',
     ));
 
+    // Stop any playing audio and disconnect existing TTS session
+    disconnectTts();
+
+    const eventName = voiceReplyEnabled ? 'session:voice_reply' : 'session:send';
+
+    // For voice reply, establish WebSocket connection to daemon TTS endpoint first
+    // so PCM frames can arrive as soon as the daemon starts streaming
+    if (voiceReplyEnabled) {
+      connectTts(sessionId, text);
+    }
+
     return new Promise<void>((resolve) => {
-      socket.emit('session:send', { sessionId, message: text }, (res: { error?: string }) => {
+      socket.emit(eventName, { sessionId, message: text }, (res: { error?: string }) => {
         if (res.error) {
           setMessages(prev => [
             ...prev,
@@ -242,6 +256,14 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
         />
         <button className="input-area__btn" type="submit" disabled={sending || !input.trim()}>
           Send
+        </button>
+        <button
+          className={`voice-toggle-btn ${voiceReplyEnabled ? 'active' : ''}`}
+          onClick={() => setVoiceReplyEnabled(v => !v)}
+          title={voiceReplyEnabled ? 'Voice reply on' : 'Voice reply off'}
+          type="button"
+        >
+          {voiceReplyEnabled ? '🔊' : '🔇'}
         </button>
       </form>
     </div>

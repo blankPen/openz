@@ -76,6 +76,9 @@ export function App() {
           <div className="empty-state">
             <div className="empty-state-icon">💬</div>
             <div>Select a session or create a new one</div>
+            <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+              Enable voice reply 🔊 in a session to hear Claude's responses
+            </p>
           </div>
         </section>
       </main>
