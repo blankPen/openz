@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZ · 附件面板</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F5F5F7;
+    --surface-2: #EDEDF0;
+    --border: #E5E5EA;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-soft: #EAF1FF;
+    --grad-blue: linear-gradient(135deg, #1A66FF 0%, #4A8BFF 100%);
+    --radius: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: var(--font); background: #0A0A0A; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    margin: 0; -webkit-font-smoothing: antialiased; color: var(--fg); overflow: hidden; }
+
+  .iphone { width: 393px; height: 852px; background: #0A0A0A; border-radius: 55px; padding: 11px;
+    box-shadow: 0 0 0 1.5px #2A2A2C, 0 0 0 4px #0F0F10, 0 30px 80px rgba(0,0,0,0.25); position: relative; }
+  .screen { width: 100%; height: 100%; background: var(--bg); border-radius: 44px; overflow: hidden;
+    position: relative; display: flex; flex-direction: column; }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 35px; background: #000; border-radius: 20px; z-index: 200; }
+  .status { height: 54px; padding: 18px 32px 0; display: flex; align-items: center;
+    justify-content: space-between; font-size: 17px; font-weight: 600; color: var(--fg); flex-shrink: 0; }
+  .status-right { display: flex; align-items: center; gap: 5px; }
+  .app { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+  /* 灰化背景 */
+  .home-bg { flex: 1; background: linear-gradient(180deg, #FFFFFF 0%, #F5F5F7 100%);
+    filter: brightness(0.65); position: relative; }
+  .home-bg::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.15); }
+
+  .topbar { display: flex; align-items: center; gap: 8px;
+    padding: 4px 14px 12px; flex-shrink: 0; position: relative; z-index: 5; }
+  .icon-btn { width: 36px; height: 36px; background: rgba(255,255,255,0.9); border: none;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--fg); }
+  .pill { display: flex; align-items: center; gap: 5px;
+    padding: 6px 0; background: transparent; border: none;
+    font-size: 14px; font-family: var(--font);
+    cursor: pointer; transition: opacity 150ms ease; }
+  .pill:active { opacity: 0.55; }
+  .pill-name { font-weight: 600; color: var(--fg); letter-spacing: -0.005em; }
+  .pill-meta { font-weight: 500; color: var(--fg-3); letter-spacing: -0.005em; }
+  .pill-arrow { width: 11px; height: 11px; color: var(--fg-3); }
+  .topbar-right { display: flex; gap: 2px; margin-left: auto; }
+
+  /* 背景层 dimmed 状态下的输入框占位 */
+
+  /* Sheet */
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg);
+    border-radius: 20px 20px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+    max-height: 78%; display: flex; flex-direction: column; z-index: 50; }
+  .sheet-handle { width: 40px; height: 4px; background: var(--surface-2);
+    border-radius: 2px; margin: 8px auto 4px; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 18px 12px; flex-shrink: 0; }
+  .sheet-title { font-size: 17px; font-weight: 700; color: var(--fg); }
+  .sheet-close { width: 28px; height: 28px; background: var(--surface); border: none;
+    border-radius: 50%; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; color: var(--fg-2); }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 0 14px 20px; scrollbar-width: none; }
+  .sheet-body::-webkit-scrollbar { display: none; }
+
+  .section-label { font-size: 11px; font-weight: 600; color: var(--fg-3);
+    text-transform: uppercase; letter-spacing: 0.08em; padding: 0 4px; margin: 14px 0 10px; }
+
+  /* 4 入口网格 */
+  .entry-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  }
+  .entry {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 14px 4px; background: var(--surface); border: none;
+    border-radius: var(--radius); cursor: pointer; font-family: var(--font);
+  }
+  .entry-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .entry-name { font-size: 12px; font-weight: 500; color: var(--fg-2); }
+
+  /* 最近文件列表 */
+  .file-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; background: var(--surface);
+    border-radius: var(--radius); margin-bottom: 6px;
+    cursor: pointer;
+  }
+  .file-thumb {
+    width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .file-body { flex: 1; min-width: 0; }
+  .file-name { font-size: 13px; font-weight: 500; color: var(--fg);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-meta { font-size: 11px; color: var(--fg-3); margin-top: 1px; }
+  .file-time { font-size: 11px; color: var(--fg-3); }
+
+  /* 拖拽提示 */
+  .dropzone {
+    margin-top: 12px; padding: 16px;
+    background: var(--primary-soft); border: 1.5px dashed var(--primary);
+    border-radius: var(--radius); text-align: center; color: var(--primary);
+    font-size: 13px; font-weight: 500;
+  }
+  .dropzone-sub { font-size: 11px; color: var(--primary); opacity: 0.7; margin-top: 4px; font-weight: 400; }
+</style>
+</head>
+<body>
+<div class="iphone">
+  <div class="screen">
+    <div class="island"></div>
+
+    <div class="status">
+      <div>9:41</div>
+      <div class="status-right">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+          <rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/>
+          <rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5"/>
+        </svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+          <path d="M8 11a1 1 0 100-2 1 1 0 000 2zM4.5 7.5a4.5 4.5 0 016.5 0l-1 1a3 3 0 00-4.5 0l-1-1zM1.5 4.5a9 9 0 0110 0l-1 1a7.5 7.5 0 00-8 0l-1-1z"/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+          <rect x="0.5" y="0.5" width="22" height="12" rx="3" stroke="currentColor" stroke-opacity="0.35"/>
+          <rect x="2" y="2" width="19" height="9" rx="1.5" fill="currentColor"/>
+          <rect x="24" y="4" width="2" height="5" rx="1" fill="currentColor" fill-opacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="app">
+      <header class="topbar">
+        <button class="icon-btn" aria-label="菜单">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+          </svg>
+        </button>
+        <button class="pill">
+          <span class="pill-name">OpenZ</span>
+          <span class="pill-meta">Z1 思考</span>
+          <svg class="pill-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,2 8,6 4,10"/></svg>
+        </button>
+        <div class="topbar-right">
+          <button class="icon-btn" aria-label="语音"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg></button>
+          <button class="icon-btn" aria-label="新建"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        </div>
+      </header>
+
+      <div class="home-bg"></div>
+
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div class="sheet-title">添加附件</div>
+          <button class="sheet-close" aria-label="关闭">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="sheet-body">
+
+          <!-- 4 个核心入口 -->
+          <div class="entry-grid">
+            <button class="entry">
+              <div class="entry-icon" style="background: #EAF1FF; color: #1A66FF;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/>
+                </svg>
+              </div>
+              <div class="entry-name">本地图片</div>
+            </button>
+
+            <button class="entry">
+              <div class="entry-icon" style="background: #FFE8DB; color: #FF7A45;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+              </div>
+              <div class="entry-name">本地文件</div>
+            </button>
+
+            <button class="entry">
+              <div class="entry-icon" style="background: #E1F4E9; color: #34A853;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/>
+                </svg>
+              </div>
+              <div class="entry-name">拍照</div>
+            </button>
+
+            <button class="entry">
+              <div class="entry-icon" style="background: #F0E7FE; color: #8B5CF6;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9,17 4,12 9,7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/>
+                </svg>
+              </div>
+              <div class="entry-name">引用回复</div>
+            </button>
+          </div>
+
+          <!-- 最近使用 -->
+          <div class="section-label">最近使用</div>
+
+          <div class="file-card">
+            <div class="file-thumb" style="background: linear-gradient(135deg, #4A8BFF, #1A66FF); color: white;">IMG</div>
+            <div class="file-body">
+              <div class="file-name">产品架构图_v2.png</div>
+              <div class="file-meta">图片 · 2.4 MB</div>
+            </div>
+            <div class="file-time">昨天</div>
+          </div>
+
+          <div class="file-card">
+            <div class="file-thumb" style="background: #F0E7FE; color: #8B5CF6;">PDF</div>
+            <div class="file-body">
+              <div class="file-name">竞品分析_Q2.pdf</div>
+              <div class="file-meta">PDF · 18 页 · 3.1 MB</div>
+            </div>
+            <div class="file-time">2 天前</div>
+          </div>
+
+          <div class="file-card">
+            <div class="file-thumb" style="background: #E1F4E9; color: #34A853;">XLS</div>
+            <div class="file-body">
+              <div class="file-name">用户访谈记录.xlsx</div>
+              <div class="file-meta">表格 · 24 KB</div>
+            </div>
+            <div class="file-time">上周</div>
+          </div>
+
+          <!-- 拖拽提示（移动端无拖拽概念，已移除） -->
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZ · 空对话态首页</title>
+<style>
+  /* === OpenZ 设计系统 token === */
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F5F5F7;
+    --surface-2: #EDEDF0;
+    --border: #E5E5EA;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-2: #1452CC;
+    --primary-soft: #EAF1FF;
+    --grad-blue: linear-gradient(135deg, #1A66FF 0%, #4A8BFF 100%);
+    --grad-orange: linear-gradient(135deg, #FF7A45 0%, #FF9966 100%);
+    --grad-purple: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: var(--font);
+    background: #0A0A0A;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+    overflow: hidden;
+  }
+
+  /* === iPhone 14 Pro 框架 === */
+  .iphone {
+    width: 393px;
+    height: 852px;
+    background: #0A0A0A;
+    border-radius: 55px;
+    padding: 11px;
+    box-shadow: 0 0 0 1.5px #2A2A2C, 0 0 0 4px #0F0F10, 0 30px 80px rgba(0,0,0,0.25);
+    position: relative;
+  }
+  .screen {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .island {
+    position: absolute;
+    top: 11px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 35px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 200;
+  }
+  .status {
+    height: 54px;
+    padding: 18px 32px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--fg);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 50;
+  }
+  .status-right { display: flex; align-items: center; gap: 5px; }
+
+  .app { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* === ① 顶部导航栏 === */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px 12px;
+    flex-shrink: 0;
+  }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--fg);
+  }
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 0;
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: opacity 150ms ease;
+  }
+  .pill:active { opacity: 0.55; }
+  .pill-name { font-weight: 600; color: var(--fg); letter-spacing: -0.005em; }
+  .pill-meta { font-weight: 500; color: var(--fg-3); letter-spacing: -0.005em; }
+  .pill-arrow { width: 11px; height: 11px; color: var(--fg-3); }
+  .topbar-right { display: flex; gap: 2px; margin-left: auto; }
+
+  /* === ② 欢迎与角色展示区 === */
+  .welcome {
+    padding: 28px 28px 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .avatar { width: 64px; height: 64px; margin: 0 auto 14px; }
+  .greeting {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: -0.01em;
+  }
+  .greeting .accent { color: var(--primary); }
+
+  /* === ③ 推荐任务/营销入口区 === */
+  .recs {
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    flex-shrink: 0;
+  }
+  .rec {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 14px;
+    border-radius: var(--radius);
+    color: white;
+    cursor: pointer;
+  }
+  .rec-blue { background: var(--grad-blue); }
+  .rec-orange { background: var(--grad-orange); }
+  .rec-purple { background: var(--grad-purple); }
+  .rec-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .rec-body { flex: 1; min-width: 0; }
+  .rec-title { font-size: 15px; font-weight: 600; margin-bottom: 1px; }
+  .rec-sub { font-size: 12px; opacity: 0.88; font-weight: 400; }
+  .rec-cta {
+    padding: 5px 11px;
+    background: rgba(255,255,255,0.28);
+    border: none;
+    border-radius: 999px;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+
+  /* === ④ 工具/Agent 快捷入口栏 === */
+  .spacer { flex: 1; }
+  .tools {
+    padding: 12px 0 6px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+  .tools::-webkit-scrollbar { display: none; }
+  .tool {
+    flex: 0 0 76px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: transform 150ms ease;
+  }
+  .tool:first-child { margin-left: 14px; }
+  .tool:last-child { margin-right: 14px; }
+  .tool:active { transform: scale(0.95); }
+  .tool.primary { position: relative; }
+  .tool.primary .tool-icon {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(26, 102, 255, 0.18);
+  }
+  .tool.primary .tool-name { font-weight: 600; color: var(--fg); }
+  .tool-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tool-name { font-size: 12px; font-weight: 500; color: var(--fg-2); }
+
+  /* === ④ 输入区 === */
+  .input-row {
+    padding: 8px 12px 4px;
+    flex-shrink: 0;
+  }
+  .input-box {
+    background: #F2F2F2;
+    border-radius: 16px;
+    padding: 10px 12px 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 56px;
+  }
+  .textfield {
+    width: 100%;
+    min-height: 24px;
+    max-height: 100px;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--fg);
+    padding: 0;
+    display: block;
+  }
+  .textfield::placeholder { color: var(--fg-3); }
+  .input-actions {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .input-action-left { margin-right: auto; }
+  .input-action-right { display: flex; gap: 8px; }
+  .input-action {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    color: var(--fg);
+    transition: opacity 150ms ease;
+  }
+  .input-action:active { opacity: 0.55; }
+  .input-action.send-btn {
+    background: var(--primary);
+    color: white;
+  }
+  .watermark {
+    text-align: center;
+    font-size: 10px;
+    color: var(--fg-3);
+    padding: 4px 0 6px;
+    flex-shrink: 0;
+  }
+  .home-bar {
+    height: 34px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 8px;
+    flex-shrink: 0;
+  }
+  .home-bar::after {
+    content: '';
+    width: 134px;
+    height: 5px;
+    background: var(--fg);
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+<div class="iphone">
+  <div class="screen">
+    <div class="island"></div>
+
+    <!-- Status bar -->
+    <div class="status">
+      <div>9:41</div>
+      <div class="status-right">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+          <rect x="0" y="8" width="3" height="4" rx="0.5"/>
+          <rect x="5" y="5" width="3" height="7" rx="0.5"/>
+          <rect x="10" y="2" width="3" height="10" rx="0.5"/>
+          <rect x="15" y="0" width="3" height="12" rx="0.5"/>
+        </svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+          <path d="M8 11a1 1 0 100-2 1 1 0 000 2zM4.5 7.5a4.5 4.5 0 016.5 0l-1 1a3 3 0 00-4.5 0l-1-1zM1.5 4.5a9 9 0 0110 0l-1 1a7.5 7.5 0 00-8 0l-1-1z"/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+          <rect x="0.5" y="0.5" width="22" height="12" rx="3" stroke="currentColor" stroke-opacity="0.35"/>
+          <rect x="2" y="2" width="19" height="9" rx="1.5" fill="currentColor"/>
+          <rect x="24" y="4" width="2" height="5" rx="1" fill="currentColor" fill-opacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="app">
+      <!-- ① 顶部导航栏 -->
+      <header class="topbar">
+        <button class="icon-btn" aria-label="菜单" onclick="window.location.href='settings.html'">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="7" x2="20" y2="7"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="17" x2="20" y2="17"/>
+          </svg>
+        </button>
+
+        <button class="pill">
+          <span class="pill-name">OpenZ</span>
+          <span class="pill-meta">Z1 思考</span>
+          <svg class="pill-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4,2 8,6 4,10"/>
+          </svg>
+        </button>
+
+        <div class="topbar-right">
+          <button class="icon-btn" aria-label="语音播报">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/>
+              <path d="M15.54 8.46a5 5 0 010 7.07"/>
+              <path d="M19.07 4.93a10 10 0 010 14.14"/>
+            </svg>
+          </button>
+          <button class="icon-btn" aria-label="实时通话">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+            </svg>
+          </button>
+          <button class="icon-btn" aria-label="新建会话">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- ② 欢迎与角色展示区 -->
+      <section class="welcome">
+        <div class="avatar">
+          <svg viewBox="0 0 64 64" width="64" height="64">
+            <defs>
+              <linearGradient id="av" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#4A8BFF"/>
+                <stop offset="1" stop-color="#1A66FF"/>
+              </linearGradient>
+            </defs>
+            <circle cx="32" cy="32" r="32" fill="url(#av)"/>
+            <!-- "Z" 字母标记：3 段折线，OpenZ 品牌首字母 -->
+            <path d="M 21 19 L 43 19 L 21 45 L 43 45"
+                  stroke="white" stroke-width="3.5" fill="none"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 class="greeting">
+          嗨 <span class="accent">Alex</span>，<br>
+          今天要和 <span class="accent">OpenZ</span> 一起做点什么？
+        </h1>
+      </section>
+
+      <!-- Spacer 推动下方区到屏幕底部 -->
+      <div class="spacer"></div>
+
+      <!-- ③ 工具/Agent 快捷入口栏 -->
+      <section class="tools">
+        <button class="tool primary">
+          <div class="tool-icon" style="background: #EAF1FF; color: #1A66FF;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m7.07 7.07l4.25 4.25M1 12h6m6 0h6M4.22 19.78l4.24-4.24m7.07-7.07l4.25-4.25"/>
+            </svg>
+          </div>
+          <span class="tool-name">通用 Agent</span>
+        </button>
+
+        <button class="tool">
+          <div class="tool-icon" style="background: #FFE8DB; color: #FF7A45;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="3" x2="9" y2="21"/>
+            </svg>
+          </div>
+          <span class="tool-name">一键 PPT</span>
+        </button>
+
+        <button class="tool">
+          <div class="tool-icon" style="background: #F0E7FE; color: #8B5CF6;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <span class="tool-name">OpenZ Claw</span>
+        </button>
+
+        <button class="tool">
+          <div class="tool-icon" style="background: #E1F4E9; color: #34A853;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <span class="tool-name">健康助手</span>
+        </button>
+      </section>
+
+      <!-- ④ 输入区 -->
+      <section class="input-row">
+        <div class="input-box">
+          <textarea class="textfield" rows="2" placeholder="尽管问，带图也行"></textarea>
+          <div class="input-actions">
+            <div class="input-action-left">
+              <button class="input-action mic-btn" aria-label="语音输入">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                  <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              </button>
+            </div>
+            <div class="input-action-right">
+              <button class="input-action plus-btn" aria-label="附件">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+              <button class="input-action send-btn" aria-label="发送">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"/>
+                  <polyline points="6,11 12,5 18,11"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="watermark">内容由 AI 生成</div>
+      <div class="home-bar"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 多行输入框：随内容自动撑高，封顶 max-height
+  document.querySelectorAll('.textfield').forEach(function (el) {
+    var fit = function () {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+    };
+    el.addEventListener('input', fit);
+    fit();
+  });
+
+  // 左边缘右滑唤起设置菜单（≥ 80px 横移、纵向偏移 < 60px）
+  (function () {
+    var sx = 0, sy = 0, tracking = false;
+    document.addEventListener('touchstart', function (e) {
+      var t = e.touches[0];
+      if (t.clientX < 28) { tracking = true; sx = t.clientX; sy = t.clientY; }
+    }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      if (!tracking) return;
+      var t = e.changedTouches[0];
+      if (t.clientX - sx > 80 && Math.abs(t.clientY - sy) < 60) {
+        window.location.href = 'settings.html';
+      }
+      tracking = false;
+    });
+    // 鼠标拖拽兼容（预览用）
+    var mx = 0, my = 0, mDown = false;
+    document.addEventListener('mousedown', function (e) {
+      if (e.clientX < 28) { mDown = true; mx = e.clientX; my = e.clientY; }
+    });
+    document.addEventListener('mouseup', function (e) {
+      if (mDown && e.clientX - mx > 80 && Math.abs(e.clientY - my) < 60) {
+        window.location.href = 'settings.html';
+      }
+      mDown = false;
+    });
+  })();
+</script>
+</body>
+</html>

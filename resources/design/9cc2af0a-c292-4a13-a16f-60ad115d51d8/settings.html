@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZ · 侧边设置菜单</title>
+<style>
+  /* === 主题变量（亮 / 暗） === */
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F5F5F7;
+    --surface-2: #EDEDF0;
+    --border: #E5E5EA;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-soft: #EAF1FF;
+    --danger: #FF3B30;
+    --success: #34C759;
+    --grad-blue: linear-gradient(135deg, #1A66FF 0%, #4A8BFF 100%);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+  }
+  [data-theme="dark"] {
+    --bg: #000000;
+    --surface: #1C1C1E;
+    --surface-2: #2C2C2E;
+    --border: #38383A;
+    --fg: #FFFFFF;
+    --fg-2: #EBEBF5;
+    --fg-3: #8E8E93;
+    --primary-soft: rgba(26, 102, 255, 0.22);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: var(--font);
+    background: #0A0A0A;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+    overflow: hidden;
+  }
+
+  /* iPhone 14 Pro 框架 */
+  .iphone { width: 393px; height: 852px; background: #0A0A0A; border-radius: 55px; padding: 11px;
+    box-shadow: 0 0 0 1.5px #2A2A2C, 0 0 0 4px #0F0F10, 0 30px 80px rgba(0,0,0,0.25); position: relative; }
+  .screen { width: 100%; height: 100%; background: var(--bg); border-radius: 44px; overflow: hidden;
+    position: relative; transition: background 280ms ease; }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 35px; background: #000; border-radius: 20px; z-index: 200; }
+  .status { height: 54px; padding: 18px 32px 0; display: flex; align-items: center;
+    justify-content: space-between; font-size: 17px; font-weight: 600; color: var(--fg); flex-shrink: 0;
+    position: relative; z-index: 5; transition: color 280ms ease; }
+  .status-right { display: flex; align-items: center; gap: 5px; }
+
+  /* 灰化的首页背景（被遮罩） */
+  .home-bg { position: absolute; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; transition: background 280ms ease; }
+  .home-bg::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.42); }
+  .home-ghost { flex: 1; position: relative; z-index: 1; display: flex; flex-direction: column;
+    padding: 70px 16px 100px; }
+  .home-ghost-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+  .ghost-burger, .ghost-pill, .ghost-icon {
+    background: var(--surface); opacity: 0.35; transition: background 280ms ease;
+  }
+  .ghost-burger { width: 36px; height: 36px; border-radius: 10px; }
+  .ghost-pill { width: 130px; height: 30px; border-radius: 999px; }
+  .ghost-icon { width: 36px; height: 36px; border-radius: 50%; }
+  .ghost-avatar { width: 64px; height: 64px; margin: 20px auto 14px; border-radius: 50%;
+    background: var(--primary); opacity: 0.32; }
+  .ghost-line { width: 65%; height: 22px; margin: 0 auto 8px;
+    background: var(--surface); opacity: 0.32; border-radius: 4px; transition: background 280ms ease; }
+  .ghost-line.short { width: 40%; }
+  .ghost-tools { display: flex; gap: 12px; margin: 20px auto; justify-content: center; }
+  .ghost-tool { width: 44px; height: 44px; border-radius: 12px; background: var(--surface); opacity: 0.3;
+    transition: background 280ms ease; }
+  .ghost-input { margin: auto 0 0; height: 50px; background: var(--surface); opacity: 0.32;
+    border-radius: 22px; transition: background 280ms ease; }
+
+  /* 抽屉 */
+  .drawer {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 320px;
+    background: var(--bg);
+    box-shadow: 4px 0 30px rgba(0,0,0,0.22);
+    display: flex; flex-direction: column;
+    z-index: 100;
+    transition: background 280ms ease;
+  }
+
+  .drawer-head {
+    padding: 60px 20px 18px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .user-card { display: flex; align-items: center; gap: 12px; }
+  .user-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--grad-blue);
+    color: white; font-size: 22px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(26,102,255,0.3);
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 17px; font-weight: 600; color: var(--fg); }
+  .user-plan {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--primary); background: var(--primary-soft);
+    padding: 3px 8px; border-radius: 999px; margin-top: 6px; font-weight: 600;
+  }
+
+  .drawer-body { flex: 1; overflow-y: auto; padding: 16px 12px; scrollbar-width: none; }
+  .drawer-body::-webkit-scrollbar { display: none; }
+
+  .menu-section { margin-bottom: 18px; }
+  .menu-section-title {
+    font-size: 11px; font-weight: 600; color: var(--fg-3);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 0 8px 6px;
+  }
+
+  .menu-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--fg);
+    min-height: 40px;
+  }
+  .menu-item:active { background: var(--surface); }
+  .menu-icon { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+    color: var(--fg-2); flex-shrink: 0; }
+  .menu-label { flex: 1; font-size: 15px; font-weight: 400; }
+  .menu-value { font-size: 14px; color: var(--fg-3); }
+
+  /* 3 段式主题切换 */
+  .theme-toggle { display: flex; background: var(--surface-2);
+    border-radius: 8px; padding: 2px; transition: background 280ms ease; }
+  .theme-opt { padding: 4px 8px; border: none; background: transparent;
+    font-size: 11px; font-weight: 600; color: var(--fg-3);
+    cursor: pointer; border-radius: 6px; font-family: var(--font);
+    transition: color 200ms ease; }
+  .theme-opt.active { background: var(--bg); color: var(--fg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+
+  /* Switch */
+  .switch { width: 40px; height: 24px; background: var(--surface-2);
+    border-radius: 999px; position: relative; cursor: pointer;
+    transition: background 200ms ease; flex-shrink: 0; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; background: white;
+    border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 200ms ease; }
+  .switch.on { background: var(--success); }
+  .switch.on::after { transform: translateX(16px); }
+
+  .drawer-foot { padding: 12px 16px 28px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .logout-btn { width: 100%; padding: 12px; background: transparent; border: none;
+    color: var(--danger); font-size: 15px; font-weight: 500; cursor: pointer;
+    border-radius: 10px; font-family: var(--font); transition: background 150ms ease; }
+  .logout-btn:active { background: var(--surface); }
+
+  /* 点空白处关闭 */
+  .close-area { position: absolute; right: 0; top: 0; bottom: 0; width: 73px; z-index: 99; cursor: pointer; }
+
+  /* Home indicator */
+  .home-bar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 134px; height: 5px; background: var(--fg); border-radius: 3px; z-index: 150;
+    transition: background 280ms ease; }
+</style>
+</head>
+<body>
+<div class="iphone">
+  <div class="screen" id="screen">
+    <div class="island"></div>
+
+    <div class="status">
+      <div>9:41</div>
+      <div class="status-right">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+          <rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/>
+          <rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5"/>
+        </svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+          <path d="M8 11a1 1 0 100-2 1 1 0 000 2zM4.5 7.5a4.5 4.5 0 016.5 0l-1 1a3 3 0 00-4.5 0l-1-1zM1.5 4.5a9 9 0 0110 0l-1 1a7.5 7.5 0 00-8 0l-1-1z"/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+          <rect x="0.5" y="0.5" width="22" height="12" rx="3" stroke="currentColor" stroke-opacity="0.35"/>
+          <rect x="2" y="2" width="19" height="9" rx="1.5" fill="currentColor"/>
+          <rect x="24" y="4" width="2" height="5" rx="1" fill="currentColor" fill-opacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 灰化的首页背景 -->
+    <div class="home-bg">
+      <div class="home-ghost">
+        <div class="home-ghost-top">
+          <div class="ghost-burger"></div>
+          <div class="ghost-pill"></div>
+          <div class="ghost-icon"></div>
+          <div class="ghost-icon"></div>
+          <div class="ghost-icon"></div>
+        </div>
+        <div class="ghost-avatar"></div>
+        <div class="ghost-line"></div>
+        <div class="ghost-line short"></div>
+        <div class="ghost-tools">
+          <div class="ghost-tool"></div>
+          <div class="ghost-tool"></div>
+          <div class="ghost-tool"></div>
+          <div class="ghost-tool"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 侧边设置抽屉 -->
+    <div class="drawer">
+      <div class="drawer-head">
+        <div class="user-card">
+          <div class="user-avatar">A</div>
+          <div class="user-info">
+            <div class="user-name">Alex</div>
+            <div class="user-plan">免费版 · 升级 Pro</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-body">
+
+        <!-- Section 1: 通用 -->
+        <div class="menu-section">
+          <div class="menu-section-title">通用</div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+              </svg>
+            </div>
+            <div class="menu-label">外观</div>
+            <div class="theme-toggle" id="themeToggle">
+              <button class="theme-opt active" data-theme="light">浅色</button>
+              <button class="theme-opt" data-theme="dark">深色</button>
+              <button class="theme-opt" data-theme="system">自动</button>
+            </div>
+          </div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+              </svg>
+            </div>
+            <div class="menu-label">字体大小</div>
+            <div class="menu-value">标准 ›</div>
+          </div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+              </svg>
+            </div>
+            <div class="menu-label">语言</div>
+            <div class="menu-value">简体中文 ›</div>
+          </div>
+        </div>
+
+        <!-- Section 2: 智能助手 -->
+        <div class="menu-section">
+          <div class="menu-section-title">智能助手</div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="8" width="14" height="11" rx="2"/>
+                <circle cx="9" cy="13" r="1.2"/><circle cx="15" cy="13" r="1.2"/>
+                <path d="M12 4v4"/><circle cx="12" cy="3" r="1.2"/>
+              </svg>
+            </div>
+            <div class="menu-label">默认模型</div>
+            <div class="menu-value">OpenZ Z1 ›</div>
+          </div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none"/>
+                <path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/>
+              </svg>
+            </div>
+            <div class="menu-label">语音播报</div>
+            <div class="switch on" data-switch></div>
+          </div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9,10 4,15 9,20"/><path d="M20 4v7a4 4 0 01-4 4H4"/>
+              </svg>
+            </div>
+            <div class="menu-label">回车发送</div>
+            <div class="switch on" data-switch></div>
+          </div>
+        </div>
+
+        <!-- Section 3: 账户 -->
+        <div class="menu-section">
+          <div class="menu-section-title">账户</div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/>
+              </svg>
+            </div>
+            <div class="menu-label">订阅 Pro</div>
+            <div class="menu-value">解锁全部能力 ›</div>
+          </div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="16"/><line x1="3" y1="20" x2="21" y2="20"/>
+              </svg>
+            </div>
+            <div class="menu-label">用量与配额</div>
+            <div class="menu-value">68% 已用 ›</div>
+          </div>
+        </div>
+
+        <!-- Section 4: 其他 -->
+        <div class="menu-section">
+          <div class="menu-section-title">其他</div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div class="menu-label">帮助与反馈</div>
+            <div class="menu-value">›</div>
+          </div>
+
+          <div class="menu-item">
+            <div class="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </div>
+            <div class="menu-label">关于 OpenZ</div>
+            <div class="menu-value">v 2.6.0 ›</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-foot">
+        <button class="logout-btn">退出登录</button>
+      </div>
+    </div>
+
+    <div class="close-area" onclick="window.location.href='home.html'"></div>
+
+    <div class="home-bar"></div>
+  </div>
+</div>
+
+<script>
+  // 主题切换：3 段式 + localStorage 持久化 + ?theme=dark 默认
+  var params = new URLSearchParams(window.location.search);
+  var initialTheme = params.get('theme') || localStorage.getItem('openz-theme') || 'light';
+
+  function applyTheme(t) {
+    var dark = (t === 'dark') ||
+               (t === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (dark) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+  function setActive(t) {
+    document.querySelectorAll('.theme-opt').forEach(function (b) { b.classList.remove('active'); });
+    var btn = document.querySelector('.theme-opt[data-theme="' + t + '"]');
+    if (btn) btn.classList.add('active');
+  }
+
+  applyTheme(initialTheme);
+  setActive(initialTheme);
+
+  document.querySelectorAll('.theme-opt').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var t = this.dataset.theme;
+      localStorage.setItem('openz-theme', t);
+      applyTheme(t);
+      setActive(t);
+    });
+  });
+
+  // Switch 开关
+  document.querySelectorAll('[data-switch]').forEach(function (sw) {
+    sw.addEventListener('click', function () { this.classList.toggle('on'); });
+  });
+</script>
+</body>
+</html>

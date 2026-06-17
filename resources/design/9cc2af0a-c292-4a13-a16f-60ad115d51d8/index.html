@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>类OpenZ AI Agent · 移动端设计</title>
+<style>
+  :root {
+    --bg: #FAFAFB;
+    --surface: #FFFFFF;
+    --border: #E5E5EA;
+    --border-soft: #F0F0F3;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-soft: #EAF1FF;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* === Header === */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 32px 48px 24px;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--primary-soft); color: var(--primary);
+    font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 32px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--fg);
+  }
+  .sub {
+    font-size: 15px; color: var(--fg-2); margin-top: 6px; line-height: 1.5;
+  }
+  .sub b { color: var(--primary); font-weight: 600; }
+  .tokens {
+    display: flex; gap: 24px; margin-top: 18px; flex-wrap: wrap;
+    font-size: 12px; color: var(--fg-3);
+  }
+  .token { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border); }
+  .swatch-blue { background: #1A66FF; }
+  .swatch-surface { background: #F5F5F7; }
+  .swatch-text { background: #1C1C1E; }
+  .swatch-purple { background: #8B5CF6; }
+  .swatch-orange { background: #FF7A45; }
+
+  .divider { height: 1px; background: var(--border); margin: 0 48px; }
+  .section-title {
+    padding: 32px 48px 8px;
+    font-size: 13px; font-weight: 600; color: var(--fg-3);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  /* === Stage === */
+  .stage {
+    padding: 24px 48px 32px;
+  }
+  .row {
+    display: flex; gap: 20px; align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .col {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .col-label {
+    font-size: 13px; font-weight: 600; color: var(--fg);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .col-num {
+    width: 22px; height: 22px; background: var(--primary); color: white;
+    border-radius: 50%; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .col-tag { font-size: 11px; color: var(--fg-3); font-weight: 400; }
+  .col-note {
+    font-size: 12px; color: var(--fg-3); max-width: 240px;
+    line-height: 1.5; text-align: center;
+  }
+
+  /* === Preview (iframe scale wrapper) === */
+  /* 关键修复：iframe 内部 393×852，通过 transform: scale() 缩到外面容器尺寸 */
+  .preview {
+    width: 240px;
+    height: 520px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    background: #FFFFFF;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .preview iframe {
+    position: absolute;
+    top: 0; left: 0;
+    width: 393px;
+    height: 852px;
+    border: 0;
+    /* 240 / 393 = 0.611, 852 * 0.611 = 521 ≈ 520 */
+    transform: scale(0.611);
+    transform-origin: top left;
+  }
+
+  /* === File list === */
+  .files {
+    padding: 8px 48px 64px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px; max-width: 1200px;
+  }
+  .file {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    text-decoration: none; color: var(--fg);
+    transition: all 150ms ease;
+  }
+  .file:hover { border-color: var(--primary); transform: translateY(-1px); }
+  .file-ico {
+    width: 32px; height: 32px; background: var(--primary-soft); color: var(--primary);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .file-body { flex: 1; min-width: 0; }
+  .file-name { font-size: 14px; font-weight: 600; }
+  .file-desc { font-size: 12px; color: var(--fg-3); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">
+    <span>●</span> 移动端 · 高保真原型
+  </div>
+  <h1>类 OpenZ · AI Agent 移动应用</h1>
+  <p class="sub">
+    对话式 AI 助手 · 5 区域首页结构 · 4 种消息气泡 ·
+    设计系统：<b>OpenZ 蓝主色</b> + 干净白底 + iOS SF 字体 + 12px 圆角
+  </p>
+  <div class="tokens">
+    <div class="token"><span class="swatch swatch-blue"></span> OpenZ Blue #1A66FF</div>
+    <div class="token"><span class="swatch swatch-text"></span> Text #1C1C1E</div>
+    <div class="token"><span class="swatch swatch-surface"></span> Surface #F5F5F7</div>
+    <div class="token"><span class="swatch swatch-purple"></span> Accent #8B5CF6</div>
+    <div class="token"><span class="swatch swatch-orange"></span> Highlight #FF7A45</div>
+    <div class="token">SF Pro · 12px radius · 393×852 viewport</div>
+  </div>
+</header>
+
+<div class="divider"></div>
+
+<div class="section-title">核心页面 · 4 屏并排</div>
+
+<div class="stage">
+  <div class="row">
+
+    <div class="col">
+      <div class="col-label"><span class="col-num">①</span> 空对话态 <span class="col-tag">home.html</span></div>
+      <div class="preview"><iframe src="home.html" loading="lazy"></iframe></div>
+      <div class="col-note">冷启动 / 清空后首页。5 区域：顶部导航 / 欢迎招呼 / 3 张推荐卡 / 横滑工具栏 / 输入区 + AI 水印。</div>
+    </div>
+
+    <div class="col">
+      <div class="col-label"><span class="col-num">②</span> 模型切换 <span class="col-tag">model-switch.html</span></div>
+      <div class="preview"><iframe src="model-switch.html" loading="lazy"></iframe></div>
+      <div class="col-note">点击首页模型 pill 弹出 bottom sheet。三段分组：基础模型 / 推理模式 / Agent 人格。</div>
+    </div>
+
+    <div class="col">
+      <div class="col-label"><span class="col-num">③</span> 附件面板 <span class="col-tag">attachment.html</span></div>
+      <div class="preview"><iframe src="attachment.html" loading="lazy"></iframe></div>
+      <div class="col-note">点击 + 按钮弹出。4 入口：本地图片 / 本地文件 / 拍照 / 引用回复 + 最近使用 + 拖拽提示。</div>
+    </div>
+
+    <div class="col">
+      <div class="col-label"><span class="col-num">④</span> 对话进行态 <span class="col-tag">conversation.html</span></div>
+      <div class="preview"><iframe src="conversation.html" loading="lazy"></iframe></div>
+      <div class="col-note">4 种气泡：用户 / AI 基础 / AI 思考 / 工具调用。Markdown 渲染、代码块、引用 @、4 项操作区。</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<div class="section-title">侧边设置菜单 · 浅 / 深主题切换</div>
+<div class="stage">
+  <div class="row">
+
+    <div class="col">
+      <div class="col-label"><span class="col-num">⑤</span> 设置菜单 · 浅色 <span class="col-tag">settings.html</span></div>
+      <div class="preview"><iframe src="settings.html" loading="lazy"></iframe></div>
+      <div class="col-note">点击首页左上角汉堡按钮 或 从左边缘右滑（≥80px）唤起。4 段菜单：通用 / 智能助手 / 账户 / 其他。</div>
+    </div>
+
+    <div class="col">
+      <div class="col-label"><span class="col-num">⑤</span> 设置菜单 · 深色 <span class="col-tag">settings.html?theme=dark</span></div>
+      <div class="preview"><iframe src="settings.html?theme=dark" loading="lazy"></iframe></div>
+      <div class="col-note">点「深色」立即全 app 切换：背景、抽屉、菜单项、灰化首页、Home indicator 一起翻转。状态写 localStorage，跨页保留。</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<div class="section-title">文件清单</div>
+<div class="files">
+  <a class="file" href="home.html" target="_blank">
+    <div class="file-ico">H</div>
+    <div class="file-body">
+      <div class="file-name">home.html</div>
+      <div class="file-desc">空对话态首页 · 主交付</div>
+    </div>
+  </a>
+  <a class="file" href="model-switch.html" target="_blank">
+    <div class="file-ico">M</div>
+    <div class="file-body">
+      <div class="file-name">model-switch.html</div>
+      <div class="file-desc">模型切换面板</div>
+    </div>
+  </a>
+  <a class="file" href="attachment.html" target="_blank">
+    <div class="file-ico">A</div>
+    <div class="file-body">
+      <div class="file-name">attachment.html</div>
+      <div class="file-desc">附件面板</div>
+    </div>
+  </a>
+  <a class="file" href="conversation.html" target="_blank">
+    <div class="file-ico">C</div>
+    <div class="file-body">
+      <div class="file-name">conversation.html</div>
+      <div class="file-desc">对话进行态 · 4 种气泡</div>
+    </div>
+  </a>
+  <a class="file" href="settings.html" target="_blank">
+    <div class="file-ico">S</div>
+    <div class="file-body">
+      <div class="file-name">settings.html</div>
+      <div class="file-desc">侧边设置菜单 · 浅 / 深主题切换</div>
+    </div>
+  </a>
+</div>
+
+</body>
+</html>

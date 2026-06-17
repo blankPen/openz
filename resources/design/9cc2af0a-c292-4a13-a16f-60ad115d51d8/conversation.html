@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZ · 对话进行态</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F5F5F7;
+    --surface-2: #EDEDF0;
+    --border: #E5E5EA;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-2: #1452CC;
+    --primary-soft: #EAF1FF;
+    --grad-blue: linear-gradient(135deg, #1A66FF 0%, #4A8BFF 100%);
+    --radius: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: var(--font);
+    background: #0A0A0A;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+    overflow: hidden;
+  }
+
+  /* iPhone 14 Pro frame (同 home.html) */
+  .iphone { width: 393px; height: 852px; background: #0A0A0A; border-radius: 55px; padding: 11px;
+    box-shadow: 0 0 0 1.5px #2A2A2C, 0 0 0 4px #0F0F10, 0 30px 80px rgba(0,0,0,0.25); position: relative; }
+  .screen { width: 100%; height: 100%; background: var(--bg); border-radius: 44px; overflow: hidden;
+    position: relative; display: flex; flex-direction: column; }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 35px; background: #000; border-radius: 20px; z-index: 200; }
+  .status { height: 54px; padding: 18px 32px 0; display: flex; align-items: center;
+    justify-content: space-between; font-size: 17px; font-weight: 600; color: var(--fg);
+    flex-shrink: 0; position: relative; z-index: 50; }
+  .status-right { display: flex; align-items: center; gap: 5px; }
+
+  .app { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* 顶部导航：菜单 + pill（左对齐） + 语音/通话/新建（右） */
+  .topbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 14px 12px; flex-shrink: 0;
+  }
+  .icon-btn { width: 36px; height: 36px; background: transparent; border: none; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fg);
+    transition: background 150ms ease; }
+  .icon-btn:active { background: var(--surface); }
+  .icon-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .pill { display: flex; align-items: center; gap: 5px;
+    padding: 6px 0; background: transparent; border: none;
+    font-size: 14px; font-family: var(--font);
+    cursor: pointer; transition: opacity 150ms ease; }
+  .pill:active { opacity: 0.55; }
+  .pill-name { font-weight: 600; color: var(--fg); letter-spacing: -0.005em; }
+  .pill-meta { font-weight: 500; color: var(--fg-3); letter-spacing: -0.005em; }
+  .pill-arrow { width: 11px; height: 11px; color: var(--fg-3); }
+  .topbar-right { display: flex; gap: 2px; margin-left: auto; }
+
+  /* 对话流 */
+  .flow {
+    flex: 1; overflow-y: auto; padding: 8px 14px 12px;
+    display: flex; flex-direction: column; gap: 14px;
+    scrollbar-width: none;
+  }
+  .flow::-webkit-scrollbar { display: none; }
+
+  .row { display: flex; flex-direction: column; gap: 6px; }
+  .row-user { align-items: flex-end; }
+  .row-ai { align-items: flex-start; }
+
+  /* 用户气泡 */
+  .bubble-user {
+    max-width: 78%;
+    padding: 10px 14px;
+    background: var(--primary);
+    color: white;
+    border-radius: 18px 18px 4px 18px;
+    font-size: 15px;
+    line-height: 1.4;
+    word-wrap: break-word;
+  }
+  .msg-time { font-size: 11px; color: var(--fg-3); padding: 0 4px; }
+
+  /* AI 标识 */
+  .ai-head { display: flex; align-items: center; gap: 7px; padding: 0 4px; }
+  .ai-avatar {
+    width: 24px; height: 24px; background: var(--grad-blue); border-radius: 50%;
+    color: white; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ai-name { font-size: 13px; font-weight: 600; color: var(--fg-2); }
+  .ai-mode { font-size: 11px; color: var(--primary); background: var(--primary-soft); padding: 1px 6px; border-radius: 4px; margin-left: 2px; }
+
+  /* AI 思考气泡（可展开） */
+  .thinking {
+    max-width: 88%;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-radius: 12px;
+    font-size: 12px; color: var(--fg-2);
+    cursor: pointer; border: none; text-align: left;
+    font-family: var(--font); width: 100%;
+  }
+  .thinking:active { background: var(--surface-2); }
+  .thinking-icon {
+    width: 18px; height: 18px; background: var(--primary-soft); color: var(--primary);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .thinking-text { flex: 1; }
+  .thinking-text b { font-weight: 600; color: var(--fg); }
+  .thinking-chev {
+    width: 12px; height: 12px; color: var(--fg-3);
+    transition: transform 200ms ease;
+  }
+  .thinking[aria-expanded="true"] .thinking-chev { transform: rotate(180deg); }
+  .thinking-detail {
+    max-width: 88%;
+    margin-top: 6px;
+    padding: 4px 0;
+    background: var(--surface);
+    border-radius: 12px;
+    overflow: hidden;
+    display: none;
+  }
+  .thinking[aria-expanded="true"] + .thinking-detail { display: block; }
+  .thinking-step {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 12px;
+    font-size: 12px; color: var(--fg-2); line-height: 1.5;
+    border-bottom: 1px solid var(--border-soft, var(--border));
+  }
+  .thinking-step:last-child { border-bottom: none; }
+  .thinking-step-num {
+    width: 18px; height: 18px; background: var(--primary-soft); color: var(--primary);
+    border-radius: 50%;
+    font-size: 10px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* AI 基础回复气泡 */
+  .bubble-ai {
+    max-width: 88%;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-radius: 4px 18px 18px 18px;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--fg);
+  }
+  .bubble-ai h3 { font-size: 15px; font-weight: 600; margin: 8px 0 4px; }
+  .bubble-ai p { margin: 4px 0; }
+  .bubble-ai ul { margin: 6px 0 6px 4px; padding-left: 16px; }
+  .bubble-ai li { margin: 2px 0; }
+  .bubble-ai b { font-weight: 600; }
+  .bubble-ai code {
+    background: #E8E8ED; padding: 1px 5px; border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 13px;
+  }
+  .code-block {
+    background: #1C1C1E; color: #E5E5EA; padding: 10px 12px;
+    border-radius: 8px; margin: 8px 0; font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px; line-height: 1.5; overflow-x: auto;
+  }
+  .code-block-head {
+    display: flex; justify-content: space-between; align-items: center;
+    color: #8E8E93; font-size: 11px; margin-bottom: 6px;
+    font-family: var(--font);
+  }
+  .code-copy {
+    background: transparent; border: 1px solid #3A3A3C; color: #8E8E93;
+    border-radius: 4px; padding: 1px 6px; font-size: 10px; cursor: pointer;
+  }
+  .bubble-ai a { color: var(--primary); text-decoration: none; }
+
+  /* AI 操作区 */
+  .ai-actions { display: flex; gap: 14px; padding: 4px 8px; }
+  .ai-action {
+    background: transparent; border: none; cursor: pointer; color: var(--fg-3);
+    display: flex; align-items: center; gap: 4px; font-size: 12px;
+    font-family: var(--font);
+    padding: 4px 2px; border-radius: 6px;
+    transition: color 150ms ease, background 150ms ease;
+  }
+  .ai-action:hover { color: var(--fg); background: var(--surface); }
+  .ai-action:active { opacity: 0.55; }
+  .ai-action:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .ai-action.liked { color: var(--primary); }
+
+  /* 工具调用卡片 */
+  .tool-card {
+    max-width: 88%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .tool-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 150ms ease;
+  }
+  .tool-head:hover { background: var(--surface); }
+  .tool-head:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
+  .tool-icon-box {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .tool-info { flex: 1; min-width: 0; }
+  .tool-name { font-size: 13px; font-weight: 600; color: var(--fg); }
+  .tool-sub { font-size: 11px; color: var(--fg-3); margin-top: 1px; }
+  .tool-chev { width: 14px; height: 14px; color: var(--fg-3); transition: transform 200ms ease; }
+  .tool-head[aria-expanded="false"] .tool-chev { transform: rotate(-90deg); }
+  .tool-body { border-top: 1px solid var(--border); padding: 8px 12px; }
+  .source {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; font-size: 12px;
+  }
+  .source + .source { border-top: 1px solid var(--surface); }
+  .source-num {
+    width: 18px; height: 18px; background: var(--primary-soft); color: var(--primary);
+    border-radius: 4px; font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .source-title { color: var(--fg); flex: 1; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .source-url { font-size: 10px; color: var(--fg-3); }
+
+  /* 引用 @ 标记（用户气泡内） */
+  .quote-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: rgba(255,255,255,0.22);
+    padding: 1px 6px; border-radius: 4px;
+    font-size: 12px; margin-bottom: 4px;
+  }
+
+  /* 输入区（对话态 · 与 home 同款） */
+  .input-row {
+    padding: 8px 12px 4px;
+    flex-shrink: 0;
+  }
+  .input-box {
+    background: #F2F2F2;
+    border-radius: 16px;
+    padding: 10px 12px 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 56px;
+  }
+  .textfield {
+    width: 100%;
+    min-height: 24px;
+    max-height: 100px;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--fg);
+    padding: 0;
+    display: block;
+  }
+  .textfield::placeholder { color: var(--fg-3); }
+  .input-actions {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .input-action-left { margin-right: auto; }
+  .input-action-right { display: flex; gap: 8px; }
+  .input-action {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    color: var(--fg);
+    transition: opacity 150ms ease;
+  }
+  .input-action:active { opacity: 0.55; }
+  .input-action:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .input-action.send-btn {
+    background: var(--primary);
+    color: white;
+  }
+  .input-action.send-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .watermark { text-align: center; font-size: 10px; color: var(--fg-3);
+    padding: 4px 0 6px; flex-shrink: 0; }
+  .home-bar { height: 34px; display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 8px; flex-shrink: 0; }
+  .home-bar::after { content: ''; width: 134px; height: 5px; background: var(--fg); border-radius: 3px; }
+
+  /* 状态行：发送中、失败 */
+  .status-line { font-size: 11px; color: var(--fg-3); display: flex; align-items: center; gap: 4px; }
+  .spinner { width: 12px; height: 12px; border: 1.5px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="iphone">
+  <div class="screen">
+    <div class="island"></div>
+
+    <div class="status">
+      <div>9:41</div>
+      <div class="status-right">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+          <rect x="0" y="8" width="3" height="4" rx="0.5"/><rect x="5" y="5" width="3" height="7" rx="0.5"/>
+          <rect x="10" y="2" width="3" height="10" rx="0.5"/><rect x="15" y="0" width="3" height="12" rx="0.5"/>
+        </svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+          <path d="M8 11a1 1 0 100-2 1 1 0 000 2zM4.5 7.5a4.5 4.5 0 016.5 0l-1 1a3 3 0 00-4.5 0l-1-1zM1.5 4.5a9 9 0 0110 0l-1 1a7.5 7.5 0 00-8 0l-1-1z"/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+          <rect x="0.5" y="0.5" width="22" height="12" rx="3" stroke="currentColor" stroke-opacity="0.35"/>
+          <rect x="2" y="2" width="19" height="9" rx="1.5" fill="currentColor"/>
+          <rect x="24" y="4" width="2" height="5" rx="1" fill="currentColor" fill-opacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="app">
+      <!-- 顶部导航 -->
+      <header class="topbar">
+        <button class="icon-btn" aria-label="菜单" onclick="window.location.href='settings.html'">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="7" x2="20" y2="7"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="17" x2="20" y2="17"/>
+          </svg>
+        </button>
+
+        <button class="pill">
+          <span class="pill-name">OpenZ</span>
+          <span class="pill-meta">Z1 思考</span>
+          <svg class="pill-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4,2 8,6 4,10"/>
+          </svg>
+        </button>
+
+        <div class="topbar-right">
+          <button class="icon-btn" aria-label="语音播报">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none"/>
+              <path d="M15.54 8.46a5 5 0 010 7.07"/>
+              <path d="M19.07 4.93a10 10 0 010 14.14"/>
+            </svg>
+          </button>
+          <button class="icon-btn" aria-label="实时通话">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+            </svg>
+          </button>
+          <button class="icon-btn" aria-label="新建会话">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- 对话流 -->
+      <div class="flow">
+
+        <!-- 消息 1：用户 -->
+        <div class="row row-user">
+          <div class="bubble-user">帮我写一份关于 AI Agent 的产品分析报告</div>
+          <div class="msg-time">16:32</div>
+        </div>
+
+        <!-- 消息 2：AI 思考（可折叠，默认展开示意） -->
+        <div class="row row-ai">
+          <div class="ai-head">
+            <div class="ai-avatar">Z</div>
+            <span class="ai-name">OpenZ</span>
+            <span class="ai-mode">思考</span>
+          </div>
+          <div class="thinking" role="button" tabindex="0" aria-expanded="false" onclick="this.setAttribute('aria-expanded', this.getAttribute('aria-expanded')==='true'?'false':'true')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+            <span class="thinking-icon">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+            </span>
+            <span class="thinking-text">已思考 <b>8 秒</b> · 规划 3 个章节</span>
+            <svg class="thinking-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="2,4 6,8 10,4"/></svg>
+          </div>
+          <div class="thinking-detail">
+            <div class="thinking-step">
+              <span class="thinking-step-num">1</span>
+              <span>理解用户问题：撰写 AI Agent 产品分析报告</span>
+            </div>
+            <div class="thinking-step">
+              <span class="thinking-step-num">2</span>
+              <span>规划 4 章节大纲：定义 / 架构 / 实现 / 应用</span>
+            </div>
+            <div class="thinking-step">
+              <span class="thinking-step-num">3</span>
+              <span>检索参考：OpenAI Function Calling 文档、Anthropic Agent 指南</span>
+            </div>
+            <div class="thinking-step">
+              <span class="thinking-step-num">4</span>
+              <span>开始撰写各章节内容</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 消息 3：AI 基础回复（Markdown） -->
+        <div class="row row-ai">
+          <div class="bubble-ai">
+            <h3>AI Agent 的产品价值分析</h3>
+            <p>AI Agent 区别于传统聊天机器人的核心在于<b>自主任务执行</b>能力。一个成熟的 Agent 产品需要三层能力支撑：</p>
+            <ul>
+              <li><b>规划层</b>：将复杂目标拆解为可执行步骤</li>
+              <li><b>记忆层</b>：跨轮次保持上下文与用户偏好</li>
+              <li><b>工具层</b>：调用外部 API 完成实际操作</li>
+            </ul>
+            <p>下面给出一个最小可运行的 Agent 循环示例：</p>
+            <div class="code-block">
+              <div class="code-block-head"><span>python</span><button class="code-copy">复制</button></div>
+              <pre>while not done:
+  thought = llm.think(state)
+  action = llm.plan(thought)
+  result = tools[action].run()
+  state.update(result)</pre>
+            </div>
+            <p>参考 <a href="#">OpenAI Function Calling 文档</a> 了解更多。</p>
+          </div>
+          <div class="msg-time">16:33</div>
+          <div class="ai-actions">
+            <button class="ai-action" aria-label="复制">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              复制
+            </button>
+            <button class="ai-action liked" aria-label="点赞">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+              8
+            </button>
+            <button class="ai-action" aria-label="重新生成">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15A9 9 0 1118 5.3L23 10"/></svg>
+              重新生成
+            </button>
+            <button class="ai-action" aria-label="分享">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              分享
+            </button>
+          </div>
+        </div>
+
+        <!-- 消息 4：用户（引用上一轮 + @ Agent） -->
+        <div class="row row-user">
+          <div class="bubble-user">
+            <div class="quote-tag">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9,17 4,12 9,7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
+              回复 @OpenZ
+            </div>
+            <div>这个 Agent 架构和传统 RAG 有什么本质不同？</div>
+          </div>
+          <div class="msg-time">16:35</div>
+        </div>
+
+        <!-- 消息 5：工具调用卡片（联网搜索） -->
+        <div class="row row-ai">
+          <div class="tool-card">
+            <div class="tool-head" role="button" tabindex="0" aria-expanded="true" onclick="var body=this.nextElementSibling;var exp=this.getAttribute('aria-expanded')==='true';this.setAttribute('aria-expanded',!exp);body.hidden=exp;" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+              <div class="tool-icon-box" style="background: #EAF1FF; color: #1A66FF;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <div class="tool-info">
+                <div class="tool-name">联网搜索 · 3 个来源</div>
+                <div class="tool-sub">关键词：Agent vs RAG 架构</div>
+              </div>
+              <svg class="tool-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 6,8 10,4"/></svg>
+            </div>
+            <div class="tool-body">
+              <div class="source">
+                <div class="source-num">1</div>
+                <div style="flex:1; min-width:0;">
+                  <div class="source-title">OpenAI Function Calling 指南</div>
+                  <div class="source-url">platform.openai.com</div>
+                </div>
+              </div>
+              <div class="source">
+                <div class="source-num">2</div>
+                <div style="flex:1; min-width:0;">
+                  <div class="source-title">Anthropic: Building effective agents</div>
+                  <div class="source-url">anthropic.com</div>
+                </div>
+              </div>
+              <div class="source">
+                <div class="source-num">3</div>
+                <div style="flex:1; min-width:0;">
+                  <div class="source-title">LangGraph: Agent 编排框架</div>
+                  <div class="source-url">langchain.com</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 消息 6：AI 基础回复（流式打字中示意） -->
+        <div class="row row-ai">
+          <div class="bubble-ai">
+            <p>两者的核心差异在于<b>主动性</b>：</p>
+            <p>RAG 是<b>检索 → 生成</b>的单次调用，Agent 是<b>思考 → 行动 → 观察</b>的循环。RAG 回答问题，Agent 解决问题。</p>
+            <p>简言之：RAG 是「更聪明的搜索」，Agent 是「能干的助手」。<span style="display:inline-block; width:8px; height:16px; background: var(--primary); vertical-align: middle; border-radius: 1px; margin-left: 2px; animation: blink 1s steps(2) infinite;"></span></p>
+          </div>
+          <div class="status-line">
+            <span class="spinner"></span>
+            OpenZ 正在回复…
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 输入区 -->
+      <section class="input-row">
+        <div class="input-box">
+          <textarea class="textfield" rows="2" placeholder="接着问 OpenZ…"></textarea>
+          <div class="input-actions">
+            <div class="input-action-left">
+              <button class="input-action mic-btn" aria-label="语音输入">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                  <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              </button>
+            </div>
+            <div class="input-action-right">
+              <button class="input-action plus-btn" aria-label="附件">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+              <button class="input-action send-btn" aria-label="发送">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"/>
+                  <polyline points="6,11 12,5 18,11"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="watermark">内容由 AI 生成</div>
+      <div class="home-bar"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes blink { 50% { opacity: 0; } }
+</style>
+
+<script>
+  document.querySelectorAll('.textfield').forEach(function (el) {
+    var fit = function () {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+    };
+    el.addEventListener('input', fit);
+    fit();
+  });
+</script>
+</body>
+</html>
