@@ -28,7 +28,9 @@ type AgentEvent =
   | { type: 'tool_result'; sessionId: string; data: any }
   | { type: 'turn_done'; sessionId: string; data: any }
   | { type: 'raw_stream_event'; sessionId: string; data: any }
-  | { type: 'error'; sessionId: string; data: { error: string } };
+  | { type: 'error'; sessionId: string; data: { error: string } }
+  | { type: 'voice_audio'; sessionId: string; data: { data: string | null } }
+  | { type: 'voice_reply_finish'; sessionId: string; data: any };
 ```
 
 ## 事件说明
@@ -47,6 +49,8 @@ type AgentEvent =
 | `turn_done` | 轮次结束 |
 | `raw_stream_event` | 原始 SDK 流事件（调试用） |
 | `error` | 发生错误，`data.error` 为错误信息 |
+| `voice_audio` | 语音音频数据块（base64），通过 `session:voice_reply` 请求触发 |
+| `voice_reply_finish` | 语音回复完成 |
 
 ## 使用示例
 

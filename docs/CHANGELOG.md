@@ -17,3 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared TypeScript types (`packages/shared`)
 - Session persistence to `~/.uran/sessions.json`
 - Agent event streaming (thinking, text_delta, tool_use, etc.)
+
+## [0.2.0] - 2026-06-17
+
+### Added
+- **packages/server**: WebSocket relay server for multi-daemon support and public network deployment
+- **Server relay mode**: Daemon supports `--server <url>` option to relay connections through relay server
+- **Heartbeat mechanism**: 30s ping interval with 90s timeout for daemon liveness detection
+- **Multi-daemon load balancing**: Least-sessions-first strategy for session distribution
+- **TTS integration**: `TTSManager` with Volcengine V3 TTS WebSocket API
+- **Voice reply**: `session:voice_reply` event with streaming TTS, sends `voice_audio` chunks to client
+- **useAudioPlayer hook**: Web Audio API hook for playing voice audio in browser
+- Voice reply toggle button (🔊/🔇) in ChatView
+
+### Changed
+- Package rename: `@uran/*` → `@openz/*` for consistency
+- CLI command rename: `uran` → `openz`
+- `packages/server` extracted as separate package
+
+### Fixed
+- Session persistence path updated to `~/.openz/sessions.json`
