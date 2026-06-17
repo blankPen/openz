@@ -2,14 +2,16 @@ import { Pressable } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { Icon } from '../common/Icon';
 
-type Props = { onPress?: () => void; accessibilityLabel?: string };
+type Props = { onPress?: () => void; accessibilityLabel?: string; testID?: string };
 
-export function AttachmentButton({ onPress, accessibilityLabel = '附件' }: Props) {
+export function AttachmentButton({ onPress, accessibilityLabel = '附件', testID }: Props) {
   const { palette } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      testID={testID}
       hitSlop={8}
       style={({ pressed }) => ({
         width: 32,

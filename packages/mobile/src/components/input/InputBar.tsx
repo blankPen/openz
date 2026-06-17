@@ -25,7 +25,7 @@ export function InputBar({ onSend, onAttachment, onMic }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
-      <AttachmentButton onPress={onAttachment} />
+      <AttachmentButton onPress={onAttachment} testID="attachment-button" />
       <View style={styles.inputWrapper}>
         <TextField
           value={text}
