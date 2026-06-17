@@ -1,18 +1,17 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
+import { useTheme } from '../src/hooks/useTheme';
+import { StatusBar as PhoneStatusBar } from '../src/components/chrome/StatusBar';
+import { DynamicIsland } from '../src/components/chrome/DynamicIsland';
+import { HomeIndicator } from '../src/components/chrome/HomeIndicator';
 
 export default function Chat() {
+  const { palette } = useTheme();
   return (
-    <SafeAreaView style={styles.root}>
-      <View style={styles.center}>
-        <Text style={styles.text}>Chat 屏 · 阶段 1 占位</Text>
-      </View>
-    </SafeAreaView>
+    <View style={{ flex: 1, backgroundColor: palette.bg }}>
+      <DynamicIsland />
+      <PhoneStatusBar />
+      <View style={{ flex: 1 }} />
+      <HomeIndicator />
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FFFFFF' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  text: { fontSize: 16, color: '#1C1C1E' },
-});
