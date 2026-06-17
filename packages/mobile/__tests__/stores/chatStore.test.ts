@@ -129,6 +129,36 @@ describe('chatStore', () => {
     });
   });
 
+  describe('setChatState', () => {
+    test.each(['idle', 'loading', 'streaming', 'error'] as const)('sets chatState to %s', (s) => {
+      useChatStore.getState().setChatState(s);
+      expect(useChatStore.getState().chatState).toBe(s);
+    });
+  });
+
+  describe('setActiveConversation', () => {
+    test('sets active conversation id', () => {
+      const id = useChatStore.getState().createConversation();
+      useChatStore.getState().setActiveConversation(id);
+      expect(useChatStore.getState().activeConversationId).toBe(id);
+    });
+
+    test('can set active to null', () => {
+      const id = useChatStore.getState().createConversation();
+      useChatStore.getState().setActiveConversation(null);
+      expect(useChatStore.getState().activeConversationId).toBeNull();
+    });
+
+    test('setActiveConversation persists', () => {
+      const id = useChatStore.getState().createConversation();
+      useChatStore.getState().setActiveConversation(id);
+      jest.isolateModules(() => {
+        const { useChatStore: fresh } = require('../../src/stores/chatStore');
+        expect(fresh.getState().activeConversationId).toBe(id);
+      });
+    });
+  });
+
   describe('persistence (MMKV mock)', () => {
     test('createConversation 后冷启动能恢复', () => {
       useChatStore.getState().createConversation();
