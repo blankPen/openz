@@ -51,7 +51,7 @@ describe('ChatScreen', () => {
   it('renders messages from store via MessageRow', () => {
     const convId = useChatStore.getState().createConversation();
     useChatStore.getState().addMessage(convId, makeMsg({ id: 'msg1', role: 'user', content: 'Hello' }));
-    useChatStore.getState().addMessage(convId, makeMsg({ id: 'msg2', role: 'assistant', content: 'Hi there' }));
+    useChatStore.getState().addMessage(convId, makeMsg({ id: 'msg2', role: 'ai', content: 'Hi there' }));
 
     const { getByText } = render(<ChatScreen />, { wrapper });
 
