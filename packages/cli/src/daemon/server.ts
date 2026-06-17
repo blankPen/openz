@@ -16,7 +16,7 @@ import type {
   SessionErrorResponse,
   SessionEventResponse,
   AgentEvent,
-} from '@uran/shared';
+} from '@openz/shared';
 import { DEFAULT_PORT, getDaemonStatePath, type DaemonState } from './types.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 
