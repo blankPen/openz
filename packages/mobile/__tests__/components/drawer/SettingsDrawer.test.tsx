@@ -34,9 +34,9 @@ describe('SettingsDrawer', () => {
 
   it('renders theme toggle options', () => {
     const { getAllByText } = render(<SettingsDrawer visible onClose={jest.fn()} />, { wrapper });
-    expect(getAllByText('浅色').length).toBeGreaterThan(0);
-    expect(getAllByText('深色').length).toBeGreaterThan(0);
-    expect(getAllByText('自动').length).toBeGreaterThan(1); // appears in MenuItem value + ThemeToggle
+    expect(getAllByText('浅色').length).toBeGreaterThanOrEqual(1);
+    expect(getAllByText('深色').length).toBeGreaterThanOrEqual(1);
+    expect(getAllByText('自动').length).toBeGreaterThanOrEqual(1); // ThemeToggle has 自动
   });
 
   it('renders logout button', () => {

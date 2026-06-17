@@ -163,8 +163,8 @@ describe('ChatScreen message styles (S8)', () => {
   describe('ThinkingCard', () => {
     it('is collapsible — content hidden when isExpanded=false, shown when true', () => {
       const steps = [
-        { step: '1', content: '分析问题' },
-        { step: '2', content: '制定计划' },
+        { step: 1, content: '分析问题' },
+        { step: 2, content: '制定计划' },
       ];
       const { getByText, queryByText, rerender } = render(
         <ThinkingCard elapsedSeconds={5} stepCount={2} steps={steps} isExpanded={false} />,
@@ -177,8 +177,7 @@ describe('ChatScreen message styles (S8)', () => {
 
       // Now expand
       rerender(
-        <ThinkingCard elapsedSeconds={5} stepCount={2} steps={steps} isExpanded={true} />,
-        { wrapper }
+        <ThinkingCard elapsedSeconds={5} stepCount={2} steps={steps} isExpanded={true} />
       );
       expect(getByText('分析问题')).toBeTruthy();
       expect(getByText('制定计划')).toBeTruthy();

@@ -2,15 +2,16 @@ import { Pressable } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { Icon } from '../common/Icon';
 
-type Props = { onPress?: () => void; disabled?: boolean; accessibilityLabel?: string };
+type Props = { onPress?: () => void; disabled?: boolean; accessibilityLabel?: string; testID?: string };
 
-export function SendButton({ onPress, disabled, accessibilityLabel = '发送' }: Props) {
+export function SendButton({ onPress, disabled, accessibilityLabel = '发送', testID }: Props) {
   const { palette } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={accessibilityLabel}
+      testID={testID}
       hitSlop={8}
       style={({ pressed }) => ({
         width: 32,

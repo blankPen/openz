@@ -6,13 +6,15 @@ type Props = {
   size?: number;      // default 64
   color?: string;     // default palette.primary
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 };
 
-export function Avatar({ label, size = 64, color, style }: Props) {
+export function Avatar({ label, size = 64, color, style, testID }: Props) {
   const { palette } = useTheme();
   const bg = color ?? palette.primary;
   return (
     <View
+      testID={testID}
       style={[
         {
           width: size,

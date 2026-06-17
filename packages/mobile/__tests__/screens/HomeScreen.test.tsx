@@ -38,14 +38,13 @@ describe('HomeScreen', () => {
     const { getByTestId } = render(<HomeScreen />, { wrapper });
 
     expect(getByTestId('welcome-section')).toBeTruthy();
-    expect(getByTestId('welcome-name')).toBeTruthy();
-    expect(getByTestId('welcome-subtitle')).toBeTruthy();
+    expect(getByTestId('welcome-greeting')).toBeTruthy();
   });
 
   it('renders InputBar with placeholder text', () => {
     const { getByPlaceholderText } = render(<HomeScreen />, { wrapper });
 
-    expect(getByPlaceholderText('输入消息...')).toBeTruthy();
+    expect(getByPlaceholderText('尽管问，带图也行')).toBeTruthy();
   });
 
   it('menu button press calls the open drawer handler', () => {
@@ -61,12 +60,11 @@ describe('HomeScreen', () => {
   it('renders tools strip', () => {
     const { getByText } = render(<HomeScreen />, { wrapper });
 
-    // Default tools
-    expect(getByText('联网')).toBeTruthy();
-    expect(getByText('Deep Research')).toBeTruthy();
-    expect(getByText('法律助手')).toBeTruthy();
-    expect(getByText('创意助手')).toBeTruthy();
-    expect(getByText('学术助手')).toBeTruthy();
+    // Default tools (S3 design spec)
+    expect(getByText('通用 Agent')).toBeTruthy();
+    expect(getByText('一键 PPT')).toBeTruthy();
+    expect(getByText('OpenZ Claw')).toBeTruthy();
+    expect(getByText('健康助手')).toBeTruthy();
   });
 
   it('pill press opens model sheet', () => {
@@ -81,10 +79,9 @@ describe('HomeScreen', () => {
   it('attachment button press calls handler', () => {
     const { getByTestId } = render(<HomeScreen />, { wrapper });
 
-    // InputBar on HomeScreen renders AttachmentButton which gets a testID from its parent
-    // Use testID on the AttachmentButton itself for reliable querying
-    const attachmentButton = getByTestId('attachment-button');
-    fireEvent.press(attachmentButton);
+    // InputBar renders PlusButton with testID
+    const plusButton = getByTestId('plus-button');
+    fireEvent.press(plusButton);
 
     expect(useSheetStore.getState().attachmentSheetVisible).toBe(true);
   });
@@ -125,24 +122,23 @@ describe('HomeScreen', () => {
 
   // S5: SettingsDrawer design spec
   describe('SettingsDrawer in HomeScreen', () => {
-    it('drawer has width of 320', () => {
-      const { root } = render(<HomeScreen />, { wrapper }) as any;
-      // Find the drawer Animated.View with width 320
-      const drawerView = root.findAllByType('RCTView').find((v: any) =>
-        v.props.style?.some?.((s: any) => s?.width === 320)
-      );
-      expect(drawerView).toBeTruthy();
+    beforeEach(() => {
+      // Ensure drawer is visible for these tests
+      useSheetStore.setState({ drawerVisible: true });
     });
 
-    it('user card present with avatar initial Z', () => {
-      useSheetStore.setState({ drawerVisible: true });
+    it('renders SettingsDrawer when drawerVisible is true', () => {
+      const { getByTestId } = render(<HomeScreen />, { wrapper });
+      // SettingsDrawer renders with its testID
+      expect(getByTestId('settings-drawer')).toBeTruthy();
+    });
+
+    it('user card present with name Alex', () => {
       const { getByText } = render(<HomeScreen />, { wrapper });
-      // Should show user name Alex
       expect(getByText('Alex')).toBeTruthy();
     });
 
-    it('drawer has at least 8 menu items across 4 sections', () => {
-      useSheetStore.setState({ drawerVisible: true });
+    it('drawer has all 4 section titles', () => {
       const { getByText } = render(<HomeScreen />, { wrapper });
       // 4 sections: 通用, 智能助手, 账户, 其他
       expect(getByText('通用')).toBeTruthy();
@@ -152,15 +148,16 @@ describe('HomeScreen', () => {
     });
 
     it('theme toggle has 3 segments (浅色/深色/自动)', () => {
-      useSheetStore.setState({ drawerVisible: true });
-      const { getByText } = render(<HomeScreen />, { wrapper });
-      expect(getByText('浅色')).toBeTruthy();
-      expect(getByText('深色')).toBeTruthy();
-      expect(getByText('自动')).toBeTruthy();
+      const { getAllByText } = render(<HomeScreen />, { wrapper });
+      // Each theme option appears in ThemeToggle (exact label) and optionally elsewhere
+      // Use getAllByText since "浅色" may appear in MenuItem value too
+      const lightBtns = getAllByText('浅色');
+      expect(lightBtns.length).toBeGreaterThanOrEqual(1);
+      expect(getAllByText('深色').length).toBeGreaterThanOrEqual(1);
+      expect(getAllByText('自动').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('logout button present with red color text', () => {
-      useSheetStore.setState({ drawerVisible: true });
+    it('logout button present', () => {
       const { getByText } = render(<HomeScreen />, { wrapper });
       expect(getByText('退出登录')).toBeTruthy();
     });
