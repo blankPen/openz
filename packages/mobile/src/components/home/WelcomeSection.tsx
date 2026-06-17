@@ -24,42 +24,38 @@ export function WelcomeSection({ name, subtitle, style }: Props) {
     <View
       style={[
         {
-          flexDirection: 'row',
+          flexDirection: 'column',
           alignItems: 'center',
-          paddingHorizontal: 20,
-          paddingVertical: 16,
+          paddingHorizontal: 28,
+          paddingBottom: 16,
           backgroundColor: palette.bg,
         },
         style,
       ]}
       testID="welcome-section"
     >
-      <Avatar label={avatarLabel} size={52} color={palette.primary} />
-      <View style={{ marginStart: 14, flex: 1 }}>
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: '700',
-            color: palette.fg,
-            includeFontPadding: false,
-          }}
-          testID="welcome-name"
-        >
-          {name}
-        </Text>
-        {subtitle && (
-          <Text
-            style={{
-              fontSize: 14,
-              color: palette.fg3,
-              marginTop: 2,
-            }}
-            testID="welcome-subtitle"
-          >
-            {subtitle}
-          </Text>
-        )}
-      </View>
+      <Avatar
+        label={avatarLabel}
+        size={64}
+        color={palette.primary}
+        style={{ marginBottom: 14 }}
+        testID="welcome-avatar"
+      />
+      <Text
+        style={{
+          fontSize: 20,
+          fontWeight: '600',
+          lineHeight: 29, // 20 * 1.45 = 29
+          color: palette.fg,
+          includeFontPadding: false,
+          textAlign: 'center',
+        }}
+        testID="welcome-greeting"
+      >
+        嗨 {name}，今天要和{' '}
+        <Text style={{ color: palette.primary }}>OpenAI</Text>
+        {' 一起做点什么？'}
+      </Text>
     </View>
   );
 }
