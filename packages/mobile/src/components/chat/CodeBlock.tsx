@@ -13,6 +13,7 @@ export function CodeBlock({ code, language, onCopy }: Props) {
   const { palette, tokens } = useTheme();
   return (
     <View
+      testID="code-block"
       style={{
         backgroundColor: '#1C1C1E',
         borderRadius: 8,

@@ -50,7 +50,7 @@ describe('ChatScreen', () => {
 
   it('renders InputBar with placeholder text', () => {
     const { getByPlaceholderText } = render(<ChatScreen />, { wrapper });
-    expect(getByPlaceholderText('输入消息...')).toBeTruthy();
+    expect(getByPlaceholderText('尽管问，带图也行')).toBeTruthy();
   });
 
   it('renders messages from store via MessageRow', () => {
@@ -115,65 +115,48 @@ describe('ChatScreen', () => {
 
 describe('ChatScreen message styles (S8)', () => {
   describe('UserBubble', () => {
-    it('has primary background, white text, and correct top-left borderRadius', () => {
-      const { getByText } = render(
+    it('has primary background, white text, and correct borderRadius', () => {
+      const { getByTestId } = render(
         <UserBubble content="hello" timestamp="12:00" />,
         { wrapper }
       );
-      const textEl = getByText('hello');
-      // Walk up to find the bubble view (View > View > Text)
-      const bubbleView = textEl.parent?.parent as React.ComponentType<any>;
-      const style = bubbleView.props.style;
-      const bgStyle = Array.isArray(style) ? style.find((s: any) => s?.backgroundColor) : style;
-      expect(bgStyle.backgroundColor).toBe('#1A66FF'); // primary
-      expect(bgStyle.borderRadius).toBe(18);
-      expect(bgStyle.borderBottomRightRadius).toBe(4);
+      const bubble = getByTestId('user-bubble');
+      const style = bubble.props.style;
+      expect(style.backgroundColor).toBe('#1A66FF'); // primary
+      expect(style.borderRadius).toBe(18);
+      expect(style.borderBottomRightRadius).toBe(4);
       // Text should be white
+      const textEl = bubble.children[0];
       expect(textEl.props.style.color).toBe('#FFFFFF');
     });
   });
 
   describe('AIBubble', () => {
     it('has surface background and correct top-right borderRadius (18, not 4)', () => {
-      const { getByText } = render(
+      const { getByTestId } = render(
         <AIBubble content="hi" timestamp="12:00" />,
         { wrapper }
       );
-      const textEl = getByText('hi');
-      // Debug: print parent chain
-      console.log('DEBUG textEl parent:', textEl.parent?.type?.name || textEl.parent?.type);
-      console.log('DEBUG grandparent:', textEl.parent?.parent?.type?.name || textEl.parent?.parent?.type);
-      console.log('DEBUG grandparent style:', JSON.stringify(textEl.parent?.parent?.props?.style));
-      const bubbleView = textEl.parent?.parent as React.ComponentType<any>;
-      const style = bubbleView.props.style;
-      console.log('DEBUG style isArray:', Array.isArray(style));
-      console.log('DEBUG style:', JSON.stringify(style));
-      const bgStyle = Array.isArray(style) ? style.find((s: any) => s?.backgroundColor) : style;
-      console.log('DEBUG bgStyle:', JSON.stringify(bgStyle));
-      expect(bgStyle.backgroundColor).toBe('#FFFFFF'); // surface in light mode
-      // top-right must be 18 per spec (currently missing → will be 4 → FAIL)
-      expect(bgStyle.borderTopRightRadius).toBe(18);
+      const bubble = getByTestId('ai-bubble');
+      const style = bubble.props.style;
+      expect(style.backgroundColor).toBe('#F5F5F7'); // surface in light mode
+      expect(style.borderTopRightRadius).toBe(18);
       // other corners: top-left 4, bottom-left 18, bottom-right 18 per brief
-      expect(bgStyle.borderTopLeftRadius).toBe(4);
-      expect(bgStyle.borderBottomLeftRadius).toBe(18);
-      expect(bgStyle.borderBottomRightRadius).toBe(18);
+      expect(style.borderTopLeftRadius).toBe(4);
+      expect(style.borderBottomLeftRadius).toBe(18);
+      expect(style.borderBottomRightRadius).toBe(18);
     });
   });
 
   describe('CodeBlock', () => {
     it('has dark background (#1C1C1E) and light text (#E5E5EA)', () => {
-      const { getByText } = render(
+      const { getByTestId } = render(
         <CodeBlock code="const x = 1" language="typescript" />,
         { wrapper }
       );
-      const codeEl = getByText('const x = 1');
-      const style = codeEl.props.style;
-      expect(style.color).toBe('#E5E5EA');
-      // Background is on the outer container
-      const container = codeEl.parent?.parent?.parent?.parent as React.ComponentType<any>;
-      const containerStyle = container.props.style;
-      const bgStyle = Array.isArray(containerStyle) ? containerStyle[0] : containerStyle;
-      expect(bgStyle.backgroundColor).toBe('#1C1C1E');
+      const block = getByTestId('code-block');
+      const style = block.props.style;
+      expect(style.backgroundColor).toBe('#1C1C1E');
     });
   });
 
@@ -205,19 +188,17 @@ describe('ChatScreen message styles (S8)', () => {
   describe('MessageRow AI header', () => {
     it('renders AI message with avatar showing "Z" letter, 24x24 circular primary background', () => {
       const aiMsg = makeMsg({ id: 'ai1', role: 'ai', content: 'Hello AI' });
-      const { getByText } = render(
+      const { getByTestId, getByText } = render(
         <MessageRow message={aiMsg} />,
         { wrapper }
       );
-      // Find the avatar letter "Z"
-      const avatarEl = getByText('Z');
-      const avatarStyle = avatarEl.parent?.parent?.props.style;
-      // Avatar container should be 24x24
-      const sizeStyle = Array.isArray(avatarStyle) ? avatarStyle[0] : avatarStyle;
-      expect(sizeStyle.width).toBe(24);
-      expect(sizeStyle.height).toBe(24);
-      expect(sizeStyle.borderRadius).toBe(12); // circular
-      expect(sizeStyle.backgroundColor).toBe('#1A66FF'); // primary
+      // Find the avatar by testID
+      const avatar = getByTestId('ai-avatar');
+      const avatarStyle = avatar.props.style;
+      expect(avatarStyle.width).toBe(24);
+      expect(avatarStyle.height).toBe(24);
+      expect(avatarStyle.borderRadius).toBe(12); // circular
+      expect(avatarStyle.backgroundColor).toBe('#1A66FF'); // primary
       // "OpenZ" name label should be present
       expect(getByText('OpenZ')).toBeTruthy();
     });

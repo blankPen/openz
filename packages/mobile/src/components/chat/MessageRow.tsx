@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { View, Text } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { UserBubble } from './UserBubble';
 import { AIBubble } from './AIBubble';
@@ -29,6 +29,38 @@ export function MessageRow({ message, onCopy, onLike, onRegenerate, onShare }: P
   // AI message
   return (
     <View style={{ paddingHorizontal: 14, paddingVertical: 6, alignItems: 'flex-start' }}>
+      {/* AI Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        {/* Avatar: 24x24, circular, primary background, "Z" letter */}
+        <View
+          testID="ai-avatar"
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: palette.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Z</Text>
+        </View>
+        {/* Name */}
+        <Text style={{ fontSize: 13, fontWeight: '600', color: palette.fg2 }}>OpenZ</Text>
+        {/* Mode tag */}
+        <Text
+          style={{
+            fontSize: 10,
+            color: palette.primary,
+            backgroundColor: palette.primarySoft,
+            paddingHorizontal: 6,
+            paddingVertical: 1,
+            borderRadius: 4,
+          }}
+        >
+          思考
+        </Text>
+      </View>
       {message.type === 'thinking' && message.thinkingSteps && (
         <ThinkingCard
           elapsedSeconds={8}

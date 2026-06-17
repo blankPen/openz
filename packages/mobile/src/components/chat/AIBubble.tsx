@@ -46,6 +46,8 @@ export function AIBubble({ content, timestamp }: Props) {
           borderRadius: 18,
           borderTopLeftRadius: 4,
           borderTopRightRadius: 18,
+          borderBottomRightRadius: 18,
+          borderBottomLeftRadius: 18,
           paddingVertical: 12,
           paddingHorizontal: 14,
         }}
