@@ -20,7 +20,7 @@ type Persisted = {
 
 const DEFAULTS: Persisted = {
   serverUrl: '',
-  themeMode: 'system',
+  themeMode: 'light',
   fontSize: 'standard',
   language: 'zh-CN',
   voiceBroadcast: true,
