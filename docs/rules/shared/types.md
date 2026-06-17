@@ -4,7 +4,7 @@
 
 ## Session
 
-会话元数据，持久化到 `~/.uran/sessions.json`：
+会话元数据，持久化到 `~/.openz/sessions.json`：
 
 ```typescript
 interface Session {
@@ -67,6 +67,15 @@ interface SendMessageRequest {
 ```typescript
 interface SessionRequest {
   sessionId: string;
+}
+```
+
+### SendVoiceReplyRequest
+
+```typescript
+interface SendVoiceReplyRequest {
+  sessionId: string;
+  message: string;
 }
 ```
 
