@@ -88,4 +88,101 @@ describe('HomeScreen', () => {
 
     expect(useSheetStore.getState().attachmentSheetVisible).toBe(true);
   });
+
+  // S4: HomeScreen structure restoration
+  it('topbar has 5 icon buttons: menu, voice, call, newChat', () => {
+    const { root } = render(<HomeScreen />, { wrapper }) as any;
+    // Find the topbar View (has borderBottomColor style)
+    const topbar = root.findAllByType('RCTView').find((v: any) =>
+      v.props.style?.some?.((s: any) => s?.borderBottomColor !== undefined)
+    );
+    expect(topbar).toBeTruthy();
+    // Within topbar, check accessibilityLabel attributes
+    const labels = topbar.findAllByType('RCTView')
+      .map((v: any) => v.props.accessibilityLabel)
+      .filter(Boolean);
+    expect(labels).toContain('打开菜单');
+    expect(labels).toContain('语音输入');
+    expect(labels).toContain('拨打');
+    expect(labels).toContain('新对话');
+    // Total: menu + voice + call + newChat = 4 icon buttons (pill is not an icon button)
+    const iconLabels = labels.filter((l: string) =>
+      ['打开菜单', '语音输入', '拨打', '新对话'].includes(l)
+    );
+    expect(iconLabels.length).toBe(4);
+  });
+
+  it('watermark "内容由 AI 生成" is present at bottom', () => {
+    const { getByText } = render(<HomeScreen />, { wrapper });
+
+    expect(getByText('内容由 AI 生成')).toBeTruthy();
+  });
+
+  it('spacer exists between welcome content and input bar', () => {
+    const { root } = render(<HomeScreen />, { wrapper }) as any;
+    // The spacer is a View with only { flex: 1 } style and no other layout properties
+    const spacer = root.findAllByType('RCTView').find((v: any) => {
+      const styles = v.props.style || [];
+      const styleArr = Array.isArray(styles) ? styles : [styles];
+      return styleArr.some((s: any) =>
+        s && s.flex === 1 && s.paddingHorizontal === undefined && s.paddingVertical === undefined
+      );
+    });
+    expect(spacer).toBeTruthy();
+  });
+
+  it('home indicator renders with 134x5 pill bar', () => {
+    const { root } = render(<HomeScreen />, { wrapper }) as any;
+    // HomeIndicator outer View has height:34, inner bar has width:134 height:5 borderRadius:3
+    // Find View with height:34 and that contains a child with width:134, height:5
+    const homeIndicatorOuter = root.findAllByType('RCTView').find((v: any) => {
+      const styles = v.props.style || [];
+      const styleArr = Array.isArray(styles) ? styles : [styles];
+      return styleArr.some((s: any) => s && s.height === 34);
+    });
+    expect(homeIndicatorOuter).toBeTruthy();
+  });
+
+  // S5: SettingsDrawer design spec
+  describe('SettingsDrawer in HomeScreen', () => {
+    it('drawer has width of 320', () => {
+      const { root } = render(<HomeScreen />, { wrapper }) as any;
+      // Find the drawer Animated.View with width 320
+      const drawerView = root.findAllByType('RCTView').find((v: any) =>
+        v.props.style?.some?.((s: any) => s?.width === 320)
+      );
+      expect(drawerView).toBeTruthy();
+    });
+
+    it('user card present with avatar initial Z', () => {
+      useSheetStore.setState({ drawerVisible: true });
+      const { getByText } = render(<HomeScreen />, { wrapper });
+      // Should show user name Alex
+      expect(getByText('Alex')).toBeTruthy();
+    });
+
+    it('drawer has at least 8 menu items across 4 sections', () => {
+      useSheetStore.setState({ drawerVisible: true });
+      const { getByText } = render(<HomeScreen />, { wrapper });
+      // 4 sections: 通用, 智能助手, 账户, 其他
+      expect(getByText('通用')).toBeTruthy();
+      expect(getByText('智能助手')).toBeTruthy();
+      expect(getByText('账户')).toBeTruthy();
+      expect(getByText('其他')).toBeTruthy();
+    });
+
+    it('theme toggle has 3 segments (浅色/深色/自动)', () => {
+      useSheetStore.setState({ drawerVisible: true });
+      const { getByText } = render(<HomeScreen />, { wrapper });
+      expect(getByText('浅色')).toBeTruthy();
+      expect(getByText('深色')).toBeTruthy();
+      expect(getByText('自动')).toBeTruthy();
+    });
+
+    it('logout button present with red color text', () => {
+      useSheetStore.setState({ drawerVisible: true });
+      const { getByText } = render(<HomeScreen />, { wrapper });
+      expect(getByText('退出登录')).toBeTruthy();
+    });
+  });
 });

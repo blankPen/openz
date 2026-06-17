@@ -1,5 +1,5 @@
-import { useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { useCallback } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
 import { useSheetStore } from '../stores/sheetStore';
@@ -11,15 +11,12 @@ import { ToolsStrip } from '../components/home/ToolsStrip';
 import { InputBar } from '../components/input/InputBar';
 import { IconButton } from '../components/topbar/IconButton';
 import { Pill } from '../components/common/Pill';
-import { Icon } from '../components/common/Icon';
 import { BottomSheet } from '../components/sheets/BottomSheet';
 import { SheetHeader } from '../components/sheets/SheetHeader';
 import { ModelOptionRow } from '../components/sheets/ModelOption';
 import { FileCard } from '../components/sheets/FileCard';
-import { Switch } from '../components/drawer/Switch';
+import { SettingsDrawer } from '../components/drawer/SettingsDrawer';
 import type { ModelOption } from '../types/chat';
-
-const DRAWER_WIDTH = 300;
 
 const MOCK_MODELS: ModelOption[] = [
   {
@@ -47,8 +44,6 @@ const MOCK_MODELS: ModelOption[] = [
 export function HomeScreen() {
   const router = useRouter();
   const { palette } = useTheme();
-  const drawerAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
-  const backdropAnim = useRef(new Animated.Value(0)).current;
 
   const {
     drawerVisible,
@@ -61,49 +56,25 @@ export function HomeScreen() {
     closeAttachmentSheet,
   } = useSheetStore();
 
-  const openDrawer = useCallback(() => {
-    setDrawerVisible(true);
-    Animated.parallel([
-      Animated.spring(drawerAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }),
-      Animated.timing(backdropAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [drawerAnim, backdropAnim, setDrawerVisible]);
-
-  const closeDrawer = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(drawerAnim, {
-        toValue: -DRAWER_WIDTH,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(backdropAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setDrawerVisible(false));
-  }, [drawerAnim, backdropAnim, setDrawerVisible]);
-
   const handleNewChat = useCallback(() => {
     router.push('/chat');
   }, [router]);
 
   const handleMenuPress = useCallback(() => {
-    openDrawer();
-  }, [openDrawer]);
+    setDrawerVisible(true);
+  }, [setDrawerVisible]);
 
   const handlePillPress = useCallback(() => {
     openModelSheet();
   }, [openModelSheet]);
+
+  const handleVoice = useCallback(() => {
+    // voice button handler
+  }, []);
+
+  const handleCall = useCallback(() => {
+    // call button handler
+  }, []);
 
   const handleAttachment = useCallback(() => {
     openAttachmentSheet();
@@ -115,6 +86,10 @@ export function HomeScreen() {
     },
     [closeModelSheet],
   );
+
+  const handleDrawerClose = useCallback(() => {
+    setDrawerVisible(false);
+  }, [setDrawerVisible]);
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
@@ -130,6 +105,8 @@ export function HomeScreen() {
       >
         <IconButton name="burger" accessibilityLabel="打开菜单" onPress={handleMenuPress} />
         <Pill name="Z1" meta="思考" onPress={handlePillPress} accessibilityLabel="切换模型" />
+        <IconButton name="voice" accessibilityLabel="语音输入" onPress={handleVoice} />
+        <IconButton name="call" accessibilityLabel="拨打" onPress={handleCall} />
         <IconButton name="plus" accessibilityLabel="新对话" onPress={handleNewChat} />
       </View>
 
@@ -139,55 +116,19 @@ export function HomeScreen() {
         <ToolsStrip />
       </View>
 
+      {/* Spacer pushes content to bottom */}
+      <View style={styles.spacer} />
+
+      {/* Watermark */}
+      <Text style={[styles.watermark, { color: palette.fg3 }]}>内容由 AI 生成</Text>
+
       {/* Input bar */}
       <InputBar onAttachment={handleAttachment} />
 
       <HomeIndicator />
 
-      {/* Backdrop */}
-      {drawerVisible && (
-        <Animated.View
-          pointerEvents="auto"
-          style={[
-            StyleSheet.absoluteFillObject,
-            { backgroundColor: 'rgba(0,0,0,0.35)', opacity: backdropAnim },
-          ]}
-        >
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={closeDrawer} accessibilityLabel="关闭" />
-        </Animated.View>
-      )}
-
-      {/* Settings Drawer */}
-      <Animated.View
-        pointerEvents={drawerVisible ? 'auto' : 'none'}
-        style={[
-          styles.drawer,
-          {
-            backgroundColor: palette.bg,
-            transform: [{ translateX: drawerAnim }],
-          },
-        ]}
-      >
-        <View style={[styles.drawerHeader, { borderBottomColor: palette.border }]}>
-          <Text style={{ fontSize: 17, fontWeight: '700', color: palette.fg }}>设置</Text>
-          <IconButton name="close" size={18} onPress={closeDrawer} accessibilityLabel="关闭" />
-        </View>
-
-        <View style={styles.drawerContent}>
-          <View style={[styles.drawerRow, { borderBottomColor: palette.border }]}>
-            <Text style={{ fontSize: 15, color: palette.fg }}>深色模式</Text>
-            <Switch value={false} onChange={() => {}} />
-          </View>
-
-          <Pressable
-            style={[styles.drawerRow, { borderBottomColor: palette.border }]}
-            onPress={() => useSheetStore.getState().openSheet('about')}
-          >
-            <Text style={{ fontSize: 15, color: palette.fg }}>关于</Text>
-            <Icon name="chevDown" size={14} color={palette.fg3} />
-          </Pressable>
-        </View>
-      </Animated.View>
+      {/* Settings Drawer - width 320 per spec */}
+      <SettingsDrawer visible={drawerVisible} onClose={handleDrawerClose} testID="settings-drawer" />
 
       {/* Model Switch Sheet */}
       <BottomSheet
@@ -232,33 +173,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   content: { flex: 1 },
-  drawer: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: DRAWER_WIDTH,
-    shadowColor: '#000',
-    shadowOffset: { width: 5, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  drawerContent: { paddingTop: 8 },
-  drawerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  spacer: { flex: 1 },
+  watermark: {
+    fontSize: 10,
+    textAlign: 'center',
+    paddingBottom: 2,
   },
 });
