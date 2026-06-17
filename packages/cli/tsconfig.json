@@ -7,8 +7,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src",
-    "declaration": true
+    "declaration": true,
+    "paths": {
+      "@openz/shared": ["../shared/src/types.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

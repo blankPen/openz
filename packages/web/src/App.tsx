@@ -37,7 +37,7 @@ export function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1 className="app-header__title">Uran</h1>
+        <h1 className="app-header__title">Openz</h1>
         <span className="app-header__subtitle">Claude Code Remote Control</span>
         <span className={`app-header__status ${statusClass}`}>{statusText}</span>
       </header>
