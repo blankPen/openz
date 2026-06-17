@@ -10,7 +10,9 @@
     "dev:server": "pnpm --filter @openz/server run dev",
     "dev:daemon": "pnpm --filter @openz/cli run dev",
     "dev:web": "pnpm --filter @openz/web run dev",
-    "build": "pnpm -r run build"
+    "dev:mobile": "pnpm --filter @openz/mobile start",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r typecheck"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.178"
