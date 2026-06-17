@@ -16,6 +16,7 @@ interface PCMPlayerInternalOptions {
   volume: number
   onended?: PCMPlayerOptions['onended']
   onstatechange?: PCMPlayerOptions['onstatechange']
+  onplaystate?: PCMPlayerOptions['onplaystate']
 }
 
 export class PCMPlayer {
@@ -28,6 +29,9 @@ export class PCMPlayer {
   private gainNode!: GainNode
   private analyserNode!: AnalyserNode
   private startTime: number | null = null
+  /** 正在播放的 BufferSource 集合,用于判断 isPlaying */
+  private activeSources = new Set<AudioBufferSourceNode>()
+  private playingFlag = false
 
   constructor(option: PCMPlayerOptions) {
     this.init(option)
@@ -202,6 +206,20 @@ export class PCMPlayer {
         }
       }
     }
+    // 追踪活跃 source + 触发 onplaystate
+    self.activeSources.add(bufferSource)
+    self.setPlaying(true)
+    bufferSource.onended = (event: Event) => {
+      self.activeSources.delete(bufferSource)
+      // 用户传的 onended 也调
+      if (typeof self.option.onended === 'function') {
+        self.option.onended(bufferSource, event)
+      }
+      // 如果没有活跃 source 且 samples 也空,标记停止
+      if (self.activeSources.size === 0 && self.samples.length === 0) {
+        self.setPlaying(false)
+      }
+    }
     const length = this.samples.length / this.option.channels
     const audioBuffer = this.audioCtx.createBuffer(
       this.option.channels,
@@ -242,6 +260,22 @@ export class PCMPlayer {
           self.option.onstatechange(self.audioCtx, event, self.audioCtx.state)
         }
       }
+    }
+  }
+
+  /**
+   * 当前是否在播放。
+   * 判定:有活跃 BufferSource 或 samples 队列非空。
+   */
+  isPlaying(): boolean {
+    return this.playingFlag
+  }
+
+  private setPlaying(playing: boolean): void {
+    if (this.playingFlag === playing) return
+    this.playingFlag = playing
+    if (typeof this.option.onplaystate === 'function') {
+      this.option.onplaystate(playing)
     }
   }
 }

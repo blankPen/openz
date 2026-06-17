@@ -22,6 +22,8 @@ export interface PCMPlayerOptions {
     event: Event,
     state: AudioContextState,
   ) => void
+  /** 播放状态变化回调(active source 数从 0 变 >0 或反之) */
+  onplaystate?: (playing: boolean) => void
 }
 
 /**

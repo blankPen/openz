@@ -36,7 +36,7 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
   // (35ms 间隔时第二次 send 仍读到 render 1 的 sending=false),
   // 用 ref 强制同步检查,防止重复 emit tts:start / session:send。
   const sendingRef = useRef(false);
-  const { connect: connectTts, disconnect: disconnectTts } = useTtsClient();
+  const { connect: connectTts, disconnect: disconnectTts, playing: ttsPlaying } = useTtsClient();
 
   const handleEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
@@ -213,6 +213,7 @@ export function ChatView({ sessionId, onBack }: ChatViewProps) {
       <div className="chat-header">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <span className="chat-header__title">Session {sessionId.slice(0, 8)}…</span>
+        {ttsPlaying && <span className="tts-playing-indicator" title="音频正在播放">🔊 播放中</span>}
       </div>
 
       <div className="messages" ref={scrollRef}>

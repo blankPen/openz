@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { PCMPlayer } from '@openz/speech/client';
 import { socket } from '../socket';
 
@@ -13,6 +13,9 @@ import { socket } from '../socket';
 export function useTtsClient() {
   const pcmPlayerRef = useRef<PCMPlayer | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  // 当前是否有音频在播。PCMPlayer 通过 onplaystate 回调通知,
+  // 这里翻译成 React state 给 UI 消费(显示"正在播放"指示等)。
+  const [playing, setPlaying] = useState(false);
 
   const ensurePlayer = useCallback(() => {
     if (!pcmPlayerRef.current) {
@@ -22,6 +25,7 @@ export function useTtsClient() {
         sampleRate: 24000,
         flushTime: 200,
         volume: 1,
+        onplaystate: (isPlaying) => setPlaying(isPlaying),
       });
     }
     return pcmPlayerRef.current;
@@ -110,5 +114,5 @@ export function useTtsClient() {
     };
   }, []);
 
-  return { connect, disconnect, destroy };
+  return { connect, disconnect, destroy, playing };
 }
