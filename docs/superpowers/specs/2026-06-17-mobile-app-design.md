@@ -3,6 +3,7 @@
 **日期**: 2026-06-17
 **状态**: 待用户复核
 **范围**: 新增 `@openz/mobile` 包,Expo (managed) iOS + Android 双端 App,通过 `packages/server`(relay)与 `packages/cli`(daemon)通信
+**设计来源**: Open Design 项目 `9cc2af0a-c292-4a13-a16f-60ad115d51d8` 的 5 个 HTML 屏 (`home.html` / `model-switch.html` / `attachment.html` / `conversation.html` / `settings.html`)
 
 ---
 
@@ -13,14 +14,20 @@
 **目标**
 
 - 在 iOS + Android 双端提供与 Web 端对齐的会话管理/聊天/TTS 体验
-- MVP 阶段不引入新功能,只把 Web 核心能力搬到手机
+- **设计稿优先**:MVP 阶段先按设计稿(详见 §15)1:1 复刻 UI,数据先用 Mock,后端连线后续迭代
 - 复用 `packages/shared` 协议类型,运行时不依赖 Node 内置模块
 
-**非目标(MVP 不做)**
+**3 阶段推进方法论**
+
+1. **阶段 1 · 脚手架**:搭建 Expo + Expo Router + Provider 链 + 主题系统 + 路由/导航/状态管理基础设施,页面无关
+2. **阶段 2 · UI 复刻**:按设计稿 1:1 还原 5 屏 UI(首页/模型切换面板/附件面板/对话进行态/侧边设置抽屉),全部使用 Mock 数据
+3. **阶段 3 · 功能连线**:按 §7 数据流逐步替换 Mock 为真实 socket/React Query 流,接上 daemon 与 relay server
+
+**非目标(全阶段都不做,留待后续扩展)**
 
 - 推送通知(APNs/FCM)
 - 离线消息缓存
-- 多账号/鉴权
+- 多账号/OAuth 鉴权
 - 局域网直连 daemon(只能走 relay)
 - 视频通话、文件上传、Camera 输入等富交互
 
@@ -32,12 +39,14 @@
 |---|---|
 | 平台 | iOS + Android 双端 |
 | 拓扑 | 仅走 `packages/server` relay,不支持 LAN 直连 daemon |
-| MVP 功能 | 会话列表 + 聊天核心 + TTS 播放 + Tool use 可视化 |
+| 设计稿 | Open Design 项目 5 个 HTML 屏,1:1 复刻为目标;**Mock 数据先行**,后端后续迭代 |
+| 阶段 2 范围 | 5 屏(首页/模型切换/附件/对话/设置)+ 3 模式主题(浅/深/自动) |
+| 路由形态 | 单 Chat 屏(无 session list 独立页),设置走 Drawer,模型切换/附件走 Bottom Sheet |
 | 脚手架 | Expo SDK 52(managed workflow) |
 | 鉴权 | 无(MVP 信任网络) |
 | 音频 | `react-native-audio-api`(Web Audio 语义) |
-| 导航 | Expo Router(file-based) |
-| 状态 | React Query(server state) + Zustand(UI state) |
+| 导航 | Expo Router(file-based) + 模态(Drawer + Bottom Sheet) |
+| 状态 | React Query(server state) + Zustand(UI/theme/settings) |
 | 代码复用 | Mobile 完全独立,仅通过 `import type` 复用 `@openz/shared` |
 | Monorepo 集成 | `packages/mobile`,与现有 5 个包同级 |
 
@@ -66,6 +75,8 @@
 
 ## 4. 项目结构
 
+> **路由形态已根据设计稿调整**:不再有独立的 session list 页和 chat 详情页 — 全部对话在单 Chat 屏完成(空闲态=设计稿 home 区域,进行态=设计稿 conversation 区域);设置走 Drawer;模型切换/附件走 Bottom Sheet。
+
 ```
 openz/
 ├── packages/
@@ -76,45 +87,105 @@ openz/
 │   ├── speech/               # 现有,不动
 │   └── mobile/               # 新增
 │       ├── app/                      # Expo Router 路由
-│       │   ├── _layout.tsx           # 根布局:Provider 链 + Stack
-│       │   ├── index.tsx             # 启动页:判断 serverUrl → 跳转
-│       │   ├── settings.tsx          # 设置:输入 relay server URL
-│       │   └── chat/
-│       │       ├── index.tsx         # 会话列表
-│       │       └── [id].tsx          # 聊天详情
+│       │   ├── _layout.tsx           # 根布局:Provider 链 + Stack + ThemeProvider
+│       │   ├── index.tsx             # 启动页:判断 serverUrl → 跳 /chat
+│       │   └── chat.tsx              # Chat 屏(idle/active 两态切换)
 │       ├── src/
 │       │   ├── components/
-│       │   │   ├── MessageBubble.tsx
-│       │   │   ├── MarkdownView.tsx
-│       │   │   ├── ChatInput.tsx
-│       │   │   ├── ToolUseBadge.tsx
-│       │   │   ├── TtsIndicator.tsx
-│       │   │   ├── SessionListItem.tsx
-│       │   │   └── ServerUrlForm.tsx
+│       │   │   ├── chrome/                   # iPhone 14 Pro 框架层(可在真机 Build 关掉)
+│       │   │   │   ├── StatusBar.tsx        # 顶部状态栏(9:41 + 信号/wifi/电池)
+│       │   │   │   ├── DynamicIsland.tsx     # 灵动岛
+│       │   │   │   └── HomeIndicator.tsx    # 底部横条
+│       │   │   ├── topbar/
+│       │   │   │   ├── TopBar.tsx           # 顶部导航栏(汉堡 + model pill + 语音/通话/新建)
+│       │   │   │   ├── ModelPill.tsx        # 模型切换 pill
+│       │   │   │   └── IconButton.tsx       # 圆形图标按钮
+│       │   │   ├── welcome/
+│       │   │   │   ├── WelcomeCard.tsx      # 头像 + 招呼语
+│       │   │   │   ├── Avatar.tsx           # 渐变圆形头像 + Z 标志
+│       │   │   │   └── Greeting.tsx         # "嗨 Alex,今天要和 OpenZ 一起做点什么?"
+│       │   │   ├── recommendations/
+│       │   │   │   ├── RecommendationCard.tsx  # 3 张渐变卡(蓝/橙/紫)
+│       │   │   │   └── RecommendationList.tsx  # 列表容器
+│       │   │   ├── shortcuts/
+│       │   │   │   ├── AgentShortcut.tsx       # 76×76 圆形 icon + 名称
+│       │   │   │   └── ShortcutRail.tsx        # 横滑容器
+│       │   │   ├── input/
+│       │   │   │   ├── ChatInputBox.tsx        # F2F2F2 圆角输入盒
+│       │   │   │   ├── TextField.tsx           # 多行自适应
+│       │   │   │   ├── MicButton.tsx
+│       │   │   │   ├── AttachmentButton.tsx
+│       │   │   │   └── SendButton.tsx
+│       │   │   ├── sheets/
+│       │   │   │   ├── BottomSheet.tsx         # 通用底部弹出层(handle + 标题 + 关闭)
+│       │   │   │   ├── ModelSwitchSheet.tsx   # 模型切换面板
+│       │   │   │   └── AttachmentSheet.tsx    # 附件面板
+│       │   │   ├── drawer/
+│       │   │   │   ├── SettingsDrawer.tsx     # 左侧抽屉
+│       │   │   │   ├── UserCard.tsx
+│       │   │   │   ├── MenuSection.tsx
+│       │   │   │   ├── MenuItem.tsx
+│       │   │   │   ├── ThemeToggle.tsx        # 3 段(浅/深/自动)
+│       │   │   │   ├── Switch.tsx
+│       │   │   │   └── LogoutButton.tsx
+│       │   │   ├── conversation/
+│       │   │   │   ├── MessageFlow.tsx        # 消息流容器(scroll)
+│       │   │   │   ├── UserBubble.tsx         # 用户气泡(蓝底白字 + 可选 quote-tag)
+│       │   │   │   ├── AIHeader.tsx           # AI 标识行(头像 + 名字 + 模式)
+│       │   │   │   ├── ThinkingBubble.tsx     # 思考气泡(可展开/折叠)
+│       │   │   │   ├── ThinkingStepList.tsx
+│       │   │   │   ├── AIBubble.tsx           # AI 基础回复(Markdown)
+│       │   │   │   ├── ToolUseCard.tsx        # 工具调用卡片(可折叠)
+│       │   │   │   ├── SourceList.tsx         # 工具源列表
+│       │   │   │   ├── QuoteTag.tsx           # "回复 @OpenZ" 标签
+│       │   │   │   ├── StatusLine.tsx         # "OpenZ 正在回复…"
+│       │   │   │   ├── BlinkingCursor.tsx     # 流式打字光标
+│       │   │   │   └── AIActions.tsx          # 4 项操作(复制/点赞/重新生成/分享)
+│       │   │   └── common/
+│       │   │       ├── Watermark.tsx          # "内容由 AI 生成"
+│       │   │       └── Icon.tsx               # 内联 SVG icon 集合
 │       │   ├── hooks/
-│       │   │   ├── useSocket.ts
-│       │   │   ├── useSessions.ts
-│       │   │   ├── useSessionStream.ts
-│       │   │   └── useTtsClient.ts
+│       │   │   ├── useSocket.ts                # 阶段 3
+│       │   │   ├── useSessions.ts              # 阶段 3
+│       │   │   ├── useSessionStream.ts         # 阶段 3
+│       │   │   ├── useTtsClient.ts             # 阶段 3
+│       │   │   ├── useTheme.ts                 # 阶段 1
+│       │   │   ├── useChatState.ts             # 阶段 2(idle ↔ active)
+│       │   │   └── useMockData.ts              # 阶段 2(Mock 数据 hook)
 │       │   ├── lib/
-│       │   │   ├── socket.ts         # Socket.IO 单例 + 重连/退避
-│       │   │   ├── audio-player.ts   # react-native-audio-api PCM player
-│       │   │   └── eventReducer.ts   # 纯函数:累积 session:event
+│       │   │   ├── socket.ts                   # 阶段 3
+│       │   │   ├── audio-player.ts             # 阶段 3
+│       │   │   └── eventReducer.ts             # 阶段 3
 │       │   ├── stores/
-│       │   │   ├── settingsStore.ts  # zustand + MMKV 持久化
-│       │   │   └── connectionStore.ts
-│       │   ├── queries/
-│       │   │   └── sessions.ts       # React Query hooks
-│       │   ├── types.ts              # 重新导出 @openz/shared 的类型
-│       │   └── theme.ts              # 颜色/间距常量
-│       ├── app.json                  # Expo 配置
-│       ├── eas.json                  # EAS Build 配置
+│       │   │   ├── settingsStore.ts            # 阶段 1(theme/font/lang/enterToSend/voiceBroadcast/...)
+│       │   │   ├── modelStore.ts               # 阶段 2(当前选中的 base/mode/personality)
+│       │   │   └── connectionStore.ts          # 阶段 3
+│       │   ├── data/
+│       │   │   └── mock.ts                     # 阶段 2(全部 mock 数据:推荐卡/Agent/模型/最近文件/示例消息)
+│       │   ├── theme/
+│       │   │   ├── tokens.ts                   # 阶段 1(颜色/字号/圆角/间距)
+│       │   │   ├── light.ts                    # 阶段 1
+│       │   │   └── dark.ts                     # 阶段 1
+│       │   ├── types.ts                        # 重新导出 @openz/shared 的类型
+│       │   └── i18n.ts                         # 文案集中
+│       ├── app.json                            # Expo 配置
+│       ├── eas.json                            # EAS Build 配置
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── README.md
 ```
 
 `pnpm-workspace.yaml` 保持 `packages/*` 不动,自然覆盖 `packages/mobile`。
+
+**路由对照表(阶段 2 完成时的最终形态)**
+
+| 路径/形态 | 渲染 | 触发方式 |
+|---|---|---|
+| `app/index.tsx` | 启动入口:检查 settingsStore,如有 serverUrl 跳 `/chat`,无则保留并提示设置 | — |
+| `app/chat.tsx` | Chat 屏:空闲态(Welcome + 推荐卡 + Agent 快捷 + 输入区)/进行态(消息流 + 输入区)二选一,基于 `useChatState` 切换 | 启动/新建会话 |
+| `SettingsDrawer` | 覆盖在 Chat 之上的左抽屉(非独立路由) | 左上角汉堡按钮 OR 左边缘右滑手势(≥80px) |
+| `ModelSwitchSheet` | 覆盖在 Chat 之上的底部 Sheet(非独立路由) | TopBar 的 ModelPill 点击 |
+| `AttachmentSheet` | 覆盖在 Chat 之上的底部 Sheet(非独立路由) | ChatInput 的 + 按钮点击 |
 
 ---
 
@@ -172,31 +243,71 @@ openz/
 
 ## 6. 核心模块职责
 
-| 模块 | 文件 | 职责 | 关键 API |
+> **设计稿驱动**:下方表格反映设计稿 1:1 所需的全部组件。阶段 1 仅实现无依赖的原子组件 + 主题,阶段 2 拼装为完整 UI,阶段 3 接入 socket/React Query。
+
+| 模块 | 文件 | 阶段 | 职责 |
 |---|---|---|---|
-| `SocketClient` | `src/lib/socket.ts` | Socket.IO 单例,封装连接/重连/重订阅 | `connect(url)` / `disconnect()` / `emit()` / `on()/off()` |
-| `useSocket` | `src/hooks/useSocket.ts` | React hook,订阅 `connect`/`disconnect`/`connect_error` | `{ status, lastError, reconnectAttempts }` |
-| `useSessions` | `src/hooks/useSessions.ts` | React Query 包装 `session:list` | `{ sessions, isLoading, refresh() }` |
-| `useSessionStream` | `src/hooks/useSessionStream.ts` | 订阅 `session:event`,通过纯函数 reducer 累积 | `{ messages, send(), interrupt() }` |
-| `useTtsClient` | `src/hooks/useTtsClient.ts` | 订阅 `tts:event`/`tts:audio`,喂 PCMPlayer | `{ connect(sid), disconnect(), playing }` |
-| `PCMPlayer` | `src/lib/audio-player.ts` | `react-native-audio-api` 包装,采样参数与 web 端 `PCMPlayer` 对齐(Int16 / 单声道 / 24000Hz / flushTime 200ms) | `feed(bytes)` / `clear()` / `destroy()` / `onplaystate` |
-| `eventReducer` | `src/lib/eventReducer.ts` | 纯函数:输入 `AgentEvent` 序列,输出消息数组 | `reduce(state, event) → state` |
-| `settingsStore` | `src/stores/settingsStore.ts` | zustand + MMKV,存 `serverUrl` / `lastSessionId` | `useSettings()` |
-| `connectionStore` | `src/stores/connectionStore.ts` | zustand,存连接态(供 UI 显示) | `useConnection()` |
-| `MessageBubble` | `src/components/MessageBubble.tsx` | 单条消息渲染,含 Markdown + Tool 指示 | — |
-| `MarkdownView` | `src/components/MarkdownView.tsx` | 包装 `react-native-markdown-display` | — |
-| `ToolUseBadge` | `src/components/ToolUseBadge.tsx` | 工具调用指示 | — |
-| `TtsIndicator` | `src/components/TtsIndicator.tsx` | "正在播放"指示 | — |
-| `ChatInput` | `src/components/ChatInput.tsx` | 输入框 + 发送按钮 | — |
-| `SessionListItem` | `src/components/SessionListItem.tsx` | 会话列表项 | — |
-| `ServerUrlForm` | `src/components/ServerUrlForm.tsx` | Settings 页表单,带 URL 格式校验 | — |
+| `ThemeProvider` | `src/theme/ThemeProvider.tsx` | 1 | 3 模式主题(light/dark/system)Provider,基于 `useColorScheme` 跟随系统 |
+| `useTheme` | `src/hooks/useTheme.ts` | 1 | 暴露当前 tokens + `setMode(light/dark/system)` |
+| `settingsStore` | `src/stores/settingsStore.ts` | 1 | zustand + MMKV,存 serverUrl / theme / fontSize / language / voiceBroadcast / enterToSend / defaultModel |
+| `modelStore` | `src/stores/modelStore.ts` | 2 | zustand,存当前选中的 base / mode / personality id |
+| `useChatState` | `src/hooks/useChatState.ts` | 2 | 暴露 `{ mode: 'idle' \| 'active', enterActive(), reset() }` |
+| `useMockData` | `src/hooks/useMockData.ts` | 2 | 暴露阶段 2 用的全部静态数据(推荐卡/Agent/模型/最近文件/示例对话) |
+| `connectionStore` | `src/stores/connectionStore.ts` | 3 | zustand,存连接态(供 UI 显示) |
+| `SocketClient` | `src/lib/socket.ts` | 3 | Socket.IO 单例,封装连接/重连/重订阅 |
+| `useSocket` | `src/hooks/useSocket.ts` | 3 | React hook,订阅 `connect`/`disconnect`/`connect_error` |
+| `useSessions` | `src/hooks/useSessions.ts` | 3 | React Query 包装 `session:list` |
+| `useSessionStream` | `src/hooks/useSessionStream.ts` | 3 | 订阅 `session:event`,通过纯函数 reducer 累积 |
+| `useTtsClient` | `src/hooks/useTtsClient.ts` | 3 | 订阅 `tts:event`/`tts:audio`,喂 PCMPlayer |
+| `PCMPlayer` | `src/lib/audio-player.ts` | 3 | `react-native-audio-api` 包装,采样参数与 web 端 `PCMPlayer` 对齐 |
+| `eventReducer` | `src/lib/eventReducer.ts` | 3 | 纯函数:输入 `AgentEvent` 序列,输出消息数组 |
+| `StatusBar` | `src/components/chrome/StatusBar.tsx` | 1 | iOS 状态栏(9:41 + 信号/wifi/电池 SVG) |
+| `DynamicIsland` | `src/components/chrome/DynamicIsland.tsx` | 1 | 灵动岛 |
+| `HomeIndicator` | `src/components/chrome/HomeIndicator.tsx` | 1 | 底部横条 |
+| `TopBar` | `src/components/topbar/TopBar.tsx` | 2 | 顶部导航栏(汉堡 + ModelPill + 语音/通话/新建 3 个 IconButton) |
+| `ModelPill` | `src/components/topbar/ModelPill.tsx` | 2 | "OpenZ · Z1 思考 ▾" pill,点击触发 `ModelSwitchSheet` |
+| `IconButton` | `src/components/topbar/IconButton.tsx` | 1 | 36×36 圆形透明按钮 |
+| `WelcomeCard` | `src/components/welcome/WelcomeCard.tsx` | 2 | 居中容器,纵向 Avatar + Greeting |
+| `Avatar` | `src/components/welcome/Avatar.tsx` | 1 | 64×64 渐变蓝圆 + Z 标志 SVG |
+| `Greeting` | `src/components/welcome/Greeting.tsx` | 2 | "嗨 <accent>Alex</accent>,今天要和 <accent>OpenZ</accent> 一起做点什么?" |
+| `RecommendationCard` | `src/components/recommendations/RecommendationCard.tsx` | 2 | 单张渐变卡(蓝/橙/紫),含 icon + title + sub + CTA 按钮 |
+| `RecommendationList` | `src/components/recommendations/RecommendationList.tsx` | 2 | 3 张卡的纵向列表 |
+| `AgentShortcut` | `src/components/shortcuts/AgentShortcut.tsx` | 2 | 76px 圆形 icon + 名称(支持 primary 高亮) |
+| `ShortcutRail` | `src/components/shortcuts/ShortcutRail.tsx` | 2 | 横滑容器,4+ 工具入口 |
+| `ChatInputBox` | `src/components/input/ChatInputBox.tsx` | 2 | F2F2F2 圆角 16px 输入盒,内含 TextField + 3 个按钮 |
+| `TextField` | `src/components/input/TextField.tsx` | 1 | 多行自适应 TextInput(min 24 / max 100) |
+| `MicButton` / `AttachmentButton` / `SendButton` | `src/components/input/*.tsx` | 1 | 输入区三个圆形按钮 |
+| `BottomSheet` | `src/components/sheets/BottomSheet.tsx` | 1 | 通用底部弹出层(handle + 标题 + 关闭),Portal 模式 |
+| `ModelSwitchSheet` | `src/components/sheets/ModelSwitchSheet.tsx` | 2 | 3 段分组(基础模型/推理模式/Agent 人格),含选中态 |
+| `AttachmentSheet` | `src/components/sheets/AttachmentSheet.tsx` | 2 | 4 入口网格 + 最近文件列表 |
+| `SettingsDrawer` | `src/components/drawer/SettingsDrawer.tsx` | 2 | 左侧抽屉(320px),含 UserCard + 4 段菜单 + 退出 |
+| `UserCard` | `src/components/drawer/UserCard.tsx` | 2 | 渐变蓝头像 + 用户名 + 套餐标签 |
+| `MenuSection` / `MenuItem` | `src/components/drawer/*.tsx` | 2 | 段标题 + 单项菜单(icon + label + value) |
+| `ThemeToggle` | `src/components/drawer/ThemeToggle.tsx` | 2 | 3 段式(浅/深/自动)切换,写 settingsStore |
+| `Switch` | `src/components/drawer/Switch.tsx` | 1 | 40×24 圆角开关(绿/灰) |
+| `LogoutButton` | `src/components/drawer/LogoutButton.tsx` | 2 | 红色退出按钮 |
+| `MessageFlow` | `src/components/conversation/MessageFlow.tsx` | 2 | 消息流容器(FlatList,自动滚到底) |
+| `UserBubble` | `src/components/conversation/UserBubble.tsx` | 2 | 用户气泡(蓝底白字 18px 圆角 + 可选 QuoteTag) |
+| `QuoteTag` | `src/components/conversation/QuoteTag.tsx` | 2 | "回复 @OpenZ" 内联标签 |
+| `AIHeader` | `src/components/conversation/AIHeader.tsx` | 2 | AI 标识行(渐变小头像 + 名字 + 模式 chip) |
+| `ThinkingBubble` | `src/components/conversation/ThinkingBubble.tsx` | 2 | 思考气泡(可展开/折叠) |
+| `ThinkingStepList` | `src/components/conversation/ThinkingStepList.tsx` | 2 | 步骤列表(每行:编号 + 文本) |
+| `AIBubble` | `src/components/conversation/AIBubble.tsx` | 2 | AI 基础回复(Markdown 渲染) |
+| `ToolUseCard` | `src/components/conversation/ToolUseCard.tsx` | 2 | 工具调用卡片(可折叠,含 SourceList) |
+| `SourceList` | `src/components/conversation/SourceList.tsx` | 2 | 工具源列表(编号 + 标题 + URL) |
+| `StatusLine` | `src/components/conversation/StatusLine.tsx` | 2 | "OpenZ 正在回复…"(带 spinner) |
+| `BlinkingCursor` | `src/components/conversation/BlinkingCursor.tsx` | 2 | 流式打字光标(8×16 闪烁块) |
+| `AIActions` | `src/components/conversation/AIActions.tsx` | 2 | 4 项操作行(复制/点赞/重新生成/分享) |
+| `Watermark` | `src/components/common/Watermark.tsx` | 2 | "内容由 AI 生成" 小字 |
+| `Icon` | `src/components/common/Icon.tsx` | 1 | 内联 SVG icon 集合(汉堡/语音/电话/加号/箭头 等) |
 
 **关注点分离原则**
 
-- `socket.ts` 是唯一与 socket.io-client 直接交互的模块
-- Hook 各自只关心一种数据流(socket 状态 / 会话列表 / 单 session 事件流 / TTS 播放)
-- `eventReducer` 是纯函数,可独立单测
-- `PCMPlayer` 不感知 socket,只接受 `feed(bytes)` 和 `clear()`
+- `socket.ts` 是唯一与 socket.io-client 直接交互的模块(阶段 3)
+- Hook 各自只关心一种数据流(theme / chat-state / model / session / tts)
+- `eventReducer` 是纯函数,可独立单测(阶段 3)
+- `PCMPlayer` 不感知 socket,只接受 `feed(bytes)` 和 `clear()`(阶段 3)
+- 主题相关的颜色/字号一律走 `useTheme().tokens`,不直接读 `colors.X` 硬编码值(便于 3 模式切换)
 
 ---
 
@@ -431,3 +542,232 @@ useEffect(() => {
 - 语音输入(STT)
 - E2E 测试(Maestro/Detox)
 - 性能压测与优化
+
+---
+
+## 14. 分阶段实施
+
+> 3 阶段推进;每阶段都需在 EAS Development Build 跑通后再进入下一阶段。
+
+### 阶段 1 · 脚手架(预计 0.5–1 天)
+
+**目标**:可启动的空白 Expo App,能切 3 模式主题,有 Provider 链和路由。
+
+| 任务 | 产物 |
+|---|---|
+| 1.1 `pnpm create expo-app` 初始化(SDK 52,blank-typescript 模板) | `packages/mobile/` 基础结构 |
+| 1.2 接入 Expo Router 4.x(改 `main` 为 `expo-router/entry`,建 `app/` 目录) | 路由生效 |
+| 1.3 配置 tsconfig / eslint / prettier | 与现有 5 个包风格一致 |
+| 1.4 安装阶段 1 依赖:`zustand` / `react-native-mmkv` / `react-native-get-random-values` / `uuid` | `package.json` 完整 |
+| 1.5 实现 `theme/tokens.ts` + `light.ts` + `dark.ts` + `ThemeProvider` + `useTheme`(3 模式,系统模式基于 `useColorScheme`) | 主题切换可工作 |
+| 1.6 实现 `settingsStore`(serverUrl / theme / fontSize / language / voiceBroadcast / enterToSend / defaultModel) | 持久化生效 |
+| 1.7 实现原子组件:Icon / IconButton / TextField / MicButton / AttachmentButton / SendButton / Switch / StatusBar / DynamicIsland / HomeIndicator | 全部 Storybook 化(或 1 个 dev 屏统一预览) |
+| 1.8 实现 `BottomSheet` 通用组件(基于 `Modal` + Animated) | 可被 2 个 sheet 复用 |
+| 1.9 `app/_layout.tsx` 串好 Provider 链:ThemeProvider / SettingsProvider / ReactQueryProvider | 启动后能根据 theme 渲染空 Chat 屏 |
+| 1.10 EAS 配置文件 `eas.json` + `app.json`(iOS Bundle ID / Android package) | dev build 可出包 |
+| 1.11 iOS Simulator + Android Emulator 跑通,确认热更新与主题切换 | 阶段 1 完成 |
+
+**阶段 1 完成判定**:`pnpm --filter @openz/mobile start` 启动后能看到一个空白 Chat 屏,顶部状态栏 + 灵动岛 + HomeIndicator 正确显示;在开发菜单中切换浅/深/自动,所有原子组件颜色正确刷新。
+
+### 阶段 2 · UI 复刻(预计 2–3 天)
+
+**目标**:1:1 复刻设计稿 5 屏,全部使用 Mock 数据;EAS Dev Build 装机后所有屏在真机上看起来与设计稿一致。
+
+| 任务 | 产物 |
+|---|---|
+| 2.1 实现 `data/mock.ts`:推荐卡 3 张 / Agent 快捷 4 个 / 模型 3 段 / 最近文件 3 个 / 示例对话 1 段(用户 + 思考 + AI 基础 + 引用 + 工具卡 + 流式中) | 全部静态数据可被 hooks 消费 |
+| 2.2 实现 `useChatState`(idle ↔ active 切换) + `useMockData` | 状态可切换 |
+| 2.3 实现 `app/chat.tsx` 骨架:TopBar + 主区(state 切换) + ChatInputBox + Watermark | 屏结构对齐 |
+| 2.4 实现 idle 态:WelcomeCard + RecommendationList + ShortcutRail | 空闲态与设计稿 home.html 一致 |
+| 2.5 实现 `ModelSwitchSheet`(3 段分组,选中态) | 点击 ModelPill 弹出,与 design 一致 |
+| 2.6 实现 `AttachmentSheet`(4 入口网格 + 最近文件列表) | 点击 + 按钮弹出 |
+| 2.7 实现 `SettingsDrawer` 框架(320px 左抽屉 + 灰化背景) | 触发方式:汉堡按钮 + 左边缘右滑(≥80px) |
+| 2.8 实现 `SettingsDrawer` 内容:UserCard + 4 段菜单(通用/智能助手/账户/其他) + ThemeToggle 接入 settingsStore + Switch 切换 + LogoutButton | 抽屉内功能与 design 一致 |
+| 2.9 实现 `useTheme` 与 Drawer 的双向联动:切换 3 模式后整个 App 立即刷新 | 主题切换无闪烁 |
+| 2.10 实现 active 态 `MessageFlow`:4 种气泡(UserBubble / ThinkingBubble+ThinkingStepList / AIBubble+Markdown / ToolUseCard+SourceList) + QuoteTag / StatusLine / BlinkingCursor / AIActions | 进行态与 design conversation.html 一致 |
+| 2.11 装入 EAS Development Build,iOS + Android 真机截图与设计稿对照,逐屏走查差异 | 视觉验收 |
+| 2.12 修复走查发现的样式差异(圆角/间距/字号/颜色微调) | 1:1 达成 |
+
+**阶段 2 完成判定**:iOS + Android 真机截图与设计稿对应页基本一致(允许 ±2px 偏差);所有交互(模型切换面板/附件面板/设置抽屉/输入区多行自适应/思考展开折叠)均工作;浅/深/自动三主题实时切换无闪烁。
+
+### 阶段 3 · 功能连线(预计 3–5 天)
+
+**目标**:把阶段 2 的 Mock 替换为真实 socket/React Query,完整运行 §7 数据流。
+
+| 任务 | 产物 |
+|---|---|
+| 3.1 安装阶段 3 依赖:`socket.io-client` / `@tanstack/react-query` / `react-native-audio-api` | `package.json` 完整 |
+| 3.2 `app/_layout.tsx` 加 ReactQueryClientProvider | queryClient 可用 |
+| 3.3 实现 `lib/socket.ts` 单例 + `useSocket` | 连接状态可视化 |
+| 3.4 接入 `useSessions`(`session:list`)替换 mock 列表 | 真实会话列表 |
+| 3.5 接入 `useSessionStream`(`session:event` + eventReducer)替换 mock 对话 | 真实事件流 |
+| 3.6 接入 `useTtsClient` + `lib/audio-player.ts`(`react-native-audio-api`) | TTS 真实播放 |
+| 3.7 后台/前台切换 `AppState` 监听(§7.6) | 切换体验完整 |
+| 3.8 错误处理(§8) | 所有错误路径可观察 |
+| 3.9 类型共享策略落地(§9) | `node:crypto` 不入包 |
+| 3.10 测试用例(§10) | 关键 reducer 与 hook 有覆盖 |
+| 3.11 端到端走查:启 daemon → 启 server → EAS dev build 真机连 server → 完整对话 + TTS 播放 | 阶段 3 完成 |
+
+**阶段 3 完成判定**:真机走查与 web 端等价;`eas build --profile preview` 出包可装;E2E 流程无断点。
+
+---
+
+## 15. 设计稿映射(Open Design → 组件)
+
+| 设计稿文件 | 对应 ReactNative 屏/组件 | 阶段 |
+|---|---|---|
+| `home.html` | `app/chat.tsx` idle 态(WelcomeCard + RecommendationList + ShortcutRail + ChatInputBox) | 2 |
+| `conversation.html` | `app/chat.tsx` active 态(MessageFlow + 4 气泡) | 2 |
+| `model-switch.html` | `ModelSwitchSheet` 3 段分组 | 2 |
+| `attachment.html` | `AttachmentSheet` 4 入口 + 最近文件 | 2 |
+| `settings.html`(浅色) | `SettingsDrawer` + `light.ts` | 2 |
+| `settings.html?theme=dark` | `SettingsDrawer` + `dark.ts`(同一组件,主题切换) | 2 |
+
+**设计 token(从 `home.html :root` 提取,作为 light 主题基线)**
+
+| Token | 值 | 用途 |
+|---|---|---|
+| `--bg` | `#FFFFFF` | 背景 |
+| `--surface` | `#F5F5F7` | 卡片/抽屉项 |
+| `--surface-2` | `#EDEDF0` | 容器内层 |
+| `--border` | `#E5E5EA` | 边框 |
+| `--fg` | `#1C1C1E` | 主文字 |
+| `--fg-2` | `#3C3C43` | 次文字 |
+| `--fg-3` | `#8E8E93` | 弱化文字 |
+| `--primary` | `#1A66FF` | 主色 |
+| `--primary-2` | `#1452CC` | 主色按压 |
+| `--primary-soft` | `#EAF1FF` | 主色弱化背景 |
+| `--grad-blue` | `linear-gradient(135deg, #1A66FF, #4A8BFF)` | 推荐卡蓝 / 头像渐变 |
+| `--grad-orange` | `linear-gradient(135deg, #FF7A45, #FF9966)` | 推荐卡橙 |
+| `--grad-purple` | `linear-gradient(135deg, #8B5CF6, #6366F1)` | 推荐卡紫 |
+| `--radius-sm` | `8px` | 小圆角 |
+| `--radius` | `12px` | 默认圆角 |
+| `--radius-lg` | `16px` | 大圆角 |
+| `--radius-xl` | `20px` | 抽屉/Sheet 顶部 |
+| `--font` | `SF Pro / PingFang SC` | 系统字体 |
+
+**dark 主题 token 覆写**(从 `settings.html [data-theme="dark"]` 提取)
+
+| Token | dark 值 |
+|---|---|
+| `--bg` | `#000000` |
+| `--surface` | `#1C1C1E` |
+| `--surface-2` | `#2C2C2E` |
+| `--border` | `#38383A` |
+| `--fg` | `#FFFFFF` |
+| `--fg-2` | `#EBEBF5` |
+| `--fg-3` | `#8E8E93` |
+| `--primary-soft` | `rgba(26, 102, 255, 0.22)` |
+
+**关键视觉参数**
+
+- iPhone 14 Pro 容器 393×852,圆角 55px,内屏 44px(开发预览可关)
+- 灵动岛 120×35 黑色圆角
+- 状态栏 54px,文字 17px
+- HomeIndicator 134×5 圆角
+- 顶部 nav 4px 14px 12px(上右下)
+- 输入盒 16px 圆角,16px 内边距,TextField min 24 / max 100
+- 推荐卡 13px 14px 内边距,12px 圆角
+- 工具 56×56 图标 + 16px 圆角 + 12px 字号
+- 抽屉 320px 宽,顶部 60px 留白给状态栏+灵动岛
+- Bottom Sheet 顶部 20px 圆角,max-height 75-78%,handle 40×4
+
+---
+
+## 16. Mock 数据形状(阶段 2 使用)
+
+> 阶段 2 全部使用以下静态数据,阶段 3 替换为 socket/React Query 时,这些形状就是前后端接口契约的来源。
+
+```typescript
+// 顶栏(每屏固定)
+const topbar: {
+  burgerEnabled: true,
+  modelPill: { name: 'OpenZ', meta: 'Z1 思考' },
+  rightActions: ['voiceBroadcast', 'realTimeCall', 'newSession'],
+};
+
+// 推荐卡(idle 态)
+const recommendations: Array<{
+  id: string;
+  title: string;
+  sub: string;
+  cta: string;             // 按钮文案
+  gradient: 'blue' | 'orange' | 'purple';
+  iconBg: string;          // 兜底(若 SVG 加载失败)
+  iconColor: string;
+}>;
+
+// Agent 快捷(idle 态)
+const agentShortcuts: Array<{
+  id: string;
+  name: string;             // 通用 Agent / 一键 PPT / OpenZ Claw / 健康助手
+  isPrimary: boolean;       // 第 1 个高亮
+  iconBg: string;
+  iconColor: string;
+}>;
+
+// 模型切换(Sheet)
+const modelOptions: {
+  base: ModelOption[];          // 基础模型: Z1 / Z0.9 / Z2 Preview
+  mode: ModelOption[];          // 推理模式: 深度思考 / 快速 / 联网 / 专业领域
+  personality: ModelOption[];   // Agent 人格: OpenZ 默认 / 小火 / 博士
+};
+
+type ModelOption = {
+  id: string;
+  name: string;
+  desc: string;
+  tag?: '最新' | '稳定' | 'Pro';
+  icon: 'cube' | 'lightning' | 'web' | 'lawyer' | 'k' | 'fire' | 'phd';
+  iconBg: string;
+  iconColor: string;
+  isLetterAvatar?: boolean;     // 人格用字母头像(K/小/博)
+};
+
+// 附件(Sheet)
+const attachmentEntries: Array<{
+  id: 'image' | 'file' | 'camera' | 'quote';
+  name: '本地图片' | '本地文件' | '拍照' | '引用回复';
+  iconBg: string;
+  iconColor: string;
+}>;
+
+const recentFiles: Array<{
+  id: string;
+  name: string;
+  type: 'IMG' | 'PDF' | 'XLS' | string;
+  meta: string;             // "图片 · 2.4 MB"
+  time: '昨天' | '2 天前' | '上周' | string;
+  thumbBg: string;          // 渐变或纯色
+  thumbColor: string;
+  thumbText: string;         // 缩略图文字
+}>;
+
+// 示例对话(active 态)
+const sampleMessages: Array<
+  | { id: string; role: 'user'; content: string; time: string }
+  | { id: string; role: 'user'; content: string; quote: { tag: '回复 @OpenZ' }; time: string }
+  | { id: string; role: 'assistant'; mode: '思考'; thinkingSummary: string; thinkingSteps: string[] }
+  | { id: string; role: 'assistant'; content: string; markdown: true; actions: { copy: true; like: number; regenerate: true; share: true } }
+  | { id: string; role: 'tool'; name: string; sub: string; sources: Array<{ num: number; title: string; url: string }> }
+  | { id: string; role: 'assistant'; content: string; streaming: true; statusLine: 'OpenZ 正在回复…' }
+>;
+
+// 设置抽屉
+const settingsMenu: {
+  通用: Array<{ id: 'appearance' | 'fontSize' | 'language'; label: string; value?: string; kind: 'themeToggle' | 'link' | 'link' }>;
+  智能助手: Array<{ id: 'defaultModel' | 'voiceBroadcast' | 'enterToSend'; label: string; value?: string; on: boolean; kind: 'link' | 'switch' | 'switch' }>;
+  账户: Array<{ id: 'subscribePro' | 'usage'; label: string; value: string; kind: 'link' }>;
+  其他: Array<{ id: 'help' | 'about'; label: string; value: string; kind: 'link' }>;
+};
+
+// 用户卡
+const userCard: {
+  name: string;        // "Alex"(MVP 占位)
+  plan: '免费版 · 升级 Pro' | string;
+  avatarLetter: string; // 头像字母 "A"
+};
+
+// 当前用户(阶段 2 占位,阶段 3 接 server 用户信息)
+const currentUser = { name: 'Alex', plan: '免费版', avatarLetter: 'A' } as const;
+```
