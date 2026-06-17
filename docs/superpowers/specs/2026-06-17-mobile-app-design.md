@@ -179,7 +179,7 @@ openz/
 | `useSessions` | `src/hooks/useSessions.ts` | React Query 包装 `session:list` | `{ sessions, isLoading, refresh() }` |
 | `useSessionStream` | `src/hooks/useSessionStream.ts` | 订阅 `session:event`,通过纯函数 reducer 累积 | `{ messages, send(), interrupt() }` |
 | `useTtsClient` | `src/hooks/useTtsClient.ts` | 订阅 `tts:event`/`tts:audio`,喂 PCMPlayer | `{ connect(sid), disconnect(), playing }` |
-| `PCMPlayer` | `src/lib/audio-player.ts` | `react-native-audio-api` 包装 | `feed(bytes)` / `clear()` / `destroy()` / `onplaystate` |
+| `PCMPlayer` | `src/lib/audio-player.ts` | `react-native-audio-api` 包装,采样参数与 web 端 `PCMPlayer` 对齐(Int16 / 单声道 / 24000Hz / flushTime 200ms) | `feed(bytes)` / `clear()` / `destroy()` / `onplaystate` |
 | `eventReducer` | `src/lib/eventReducer.ts` | 纯函数:输入 `AgentEvent` 序列,输出消息数组 | `reduce(state, event) → state` |
 | `settingsStore` | `src/stores/settingsStore.ts` | zustand + MMKV,存 `serverUrl` / `lastSessionId` | `useSettings()` |
 | `connectionStore` | `src/stores/connectionStore.ts` | zustand,存连接态(供 UI 显示) | `useConnection()` |
@@ -296,18 +296,24 @@ PCMPlayer.onplaystate(isPlaying) → useTtsClient.playing → TtsIndicator UI
 
 ### 7.6 后台 / 前台切换
 
+监听器注册位置:`app/_layout.tsx` 中,通过 `useEffect` 挂载,清理函数在 unmount 时移除。需要在 React Query 与 socket 单例均已初始化的 Provider 内。
+
 ```
-AppState.addEventListener('change', (state) => {
-  if (state === 'background') {
-    PCMPlayer.clear()
-    socket.io.opts.reconnection = false
-  }
-  if (state === 'active') {
-    socket.io.opts.reconnection = true
-    socket.connect()                  // 强制重连
-    queryClient.invalidateQueries(['sessions'])
-  }
-})
+// app/_layout.tsx(伪代码)
+useEffect(() => {
+  const sub = AppState.addEventListener('change', (state) => {
+    if (state === 'background') {
+      PCMPlayer.clear()                          // 清空 PCMPlayer 待播队列
+      socket.io.opts.reconnection = false        // 暂停 socket.io 自动重连
+    }
+    if (state === 'active') {
+      socket.io.opts.reconnection = true
+      socket.connect()                           // 强制重连一次
+      queryClient.invalidateQueries(['sessions']) // 触发 session:list 重新拉取
+    }
+  })
+  return () => sub.remove()
+}, [])
 ```
 
 ---
@@ -388,12 +394,14 @@ AppState.addEventListener('change', (state) => {
   },
   "submit": {
     "production": {
-      "ios":     { "ascAppId": "<TBD>" },
+      "ios":     { "ascAppId": "TBD_AFTER_APPLE_CONNECT_SETUP" },
       "android": { "track": "internal" }
     }
   }
 }
 ```
+
+> `ascAppId` 是 Apple App Store Connect 上注册 App 后获得的 ID(形如 `1234567890`),EAS Submit 阶段才需要,MVP 阶段(本地 dev/preview 构建)无需填写,首次准备提交 App Store 时再回填。
 
 **CI(后续单独 spec)— MVP 不强制**
 
