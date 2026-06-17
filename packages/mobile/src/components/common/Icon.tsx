@@ -8,10 +8,10 @@ export type IconName =
   | 'help' | 'info' | 'sparkles' | 'bell' | 'gear' | 'logout' | 'textSize' | 'lang'
   | 'menu' | 'model' | 'search' | 'file' | 'star' | 'chart';
 
-type Props = { name: IconName; size?: number; color: string; testID?: string };
+type Props = { name: IconName; size?: number; color: string; testID?: string; style?: object };
 
-export function Icon({ name, size = 22, color, testID }: Props) {
-  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, testID };
+export function Icon({ name, size = 22, color, testID, style }: Props) {
+  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, testID, style };
   switch (name) {
     case 'burger': return <Svg {...props}><Line x1={4} y1={7} x2={20} y2={7} /><Line x1={4} y1={12} x2={20} y2={12} /><Line x1={4} y1={17} x2={20} y2={17} /></Svg>;
     case 'arrowDown': return <Svg {...props}><Polyline points="6 9 12 15 18 9" /></Svg>;
