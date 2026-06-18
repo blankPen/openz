@@ -7,9 +7,9 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe('ModelSwitchSheet', () => {
-  it('renders sheet title "切换模型/模式"', () => {
+  it('renders sheet title "切换模型"', () => {
     const { getByText } = render(<ModelSwitchSheet visible onClose={jest.fn()} />, { wrapper });
-    expect(getByText('切换模型/模式')).toBeTruthy();
+    expect(getByText('切换模型')).toBeTruthy();
   });
 
   it('renders subtitle about immediate effect', () => {
@@ -17,13 +17,11 @@ describe('ModelSwitchSheet', () => {
     expect(getByText('选择后立即生效，下一条消息生效')).toBeTruthy();
   });
 
-  it('renders 3 sections', () => {
-    const { getAllByTestId } = render(<ModelSwitchSheet visible onClose={jest.fn()} />, { wrapper });
-    // Section titles are rendered as uppercase labels
+  it('renders 3 sections (设计稿 model-switch.html)', () => {
     const { getByText } = render(<ModelSwitchSheet visible onClose={jest.fn()} />, { wrapper });
     expect(getByText('基础模型')).toBeTruthy();
     expect(getByText('推理模式')).toBeTruthy();
-    expect(getByText('Agent人格')).toBeTruthy();
+    expect(getByText('Agent 人格')).toBeTruthy();
   });
 
   it('renders model section options', () => {
@@ -41,11 +39,16 @@ describe('ModelSwitchSheet', () => {
     expect(getByText('专业领域')).toBeTruthy();
   });
 
-  it('renders persona section options', () => {
+  it('renders persona section options (设计稿)', () => {
     const { getByText } = render(<ModelSwitchSheet visible onClose={jest.fn()} />, { wrapper });
-    expect(getByText('OpenZ默认')).toBeTruthy();
-    expect(getByText('小火')).toBeTruthy();
-    expect(getByText('博士')).toBeTruthy();
+    expect(getByText('OpenZ 默认')).toBeTruthy();
+    expect(getByText('小火 · 创意')).toBeTruthy();
+    expect(getByText('博士 · 严谨')).toBeTruthy();
+  });
+
+  it('does not render when not visible', () => {
+    const { queryByText } = render(<ModelSwitchSheet visible={false} onClose={jest.fn()} />, { wrapper });
+    expect(queryByText('切换模型')).toBeNull();
   });
 
   it('does not render when not visible', () => {

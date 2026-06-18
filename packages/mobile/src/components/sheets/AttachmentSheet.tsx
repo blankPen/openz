@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { BottomSheet } from './BottomSheet';
 import { Icon } from '../common/Icon';
@@ -10,10 +10,10 @@ type Props = {
   testID?: string;
 };
 
-// ── Entry grid item ───────────────────────────────────────────────────────────
+// ── 4 核心入口 —— 与设计稿 attachment.html 对齐 ──────────────────────────────
 
 type Entry = {
-  icon: string;
+  icon: 'image' | 'doc' | 'camera' | 'quote';
   label: string;
   color: string;
   bg: string;
@@ -21,82 +21,114 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   { icon: 'image', label: '本地图片', color: '#1A66FF', bg: '#EAF1FF' },
-  { icon: 'file', label: '本地文件', color: '#FF7A45', bg: '#FFE8DB' },
+  { icon: 'doc', label: '本地文件', color: '#FF7A45', bg: '#FFE8DB' },
   { icon: 'camera', label: '拍照', color: '#34A853', bg: '#E1F4E9' },
   { icon: 'quote', label: '引用回复', color: '#8B5CF6', bg: '#F0E7FE' },
 ];
 
-function EntryGrid() {
-  const { palette, tokens } = useTheme();
+// ── Entry grid item ────────────────────────────────────────────────────────
+
+function EntryItem({ entry, testID }: { entry: Entry; testID?: string }) {
+  const { tokens } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', marginBottom: 20 }}>
-      {ENTRIES.map((e) => (
-        <Pressable
-          key={e.label}
-          onPress={() => {}}
-          style={({ pressed }) => [
-            {
-              flex: 1,
-              alignItems: 'center',
-              gap: 6,
-              paddingVertical: 14,
-              borderRadius: 12,
-              backgroundColor: e.bg,
-              opacity: pressed ? 0.6 : 1,
-            },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={e.label}
-        >
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: e.bg, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={e.icon as any} size={22} color={e.color} />
-          </View>
-          <Text style={{ color: palette.fg, fontSize: tokens.fontSize.xs, fontWeight: '500' }}>
-            {e.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+    <Pressable
+      onPress={() => {}}
+      testID={testID}
+      style={({ pressed }) => [
+        styles.entry,
+        { backgroundColor: '#F5F5F7', opacity: pressed ? 0.6 : 1 },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={entry.label}
+    >
+      <View
+        testID={testID ? `${testID}-icon` : undefined}
+        style={[
+          styles.entryIcon,
+          { backgroundColor: entry.bg },
+        ]}
+      >
+        <Icon name={entry.icon} size={22} color={entry.color} />
+      </View>
+      <Text style={{ color: '#3C3C43', fontSize: tokens.fontSize.xs, fontWeight: '500' }}>
+        {entry.label}
+      </Text>
+    </Pressable>
   );
 }
 
-// ── Recent files ─────────────────────────────────────────────────────────────
+// ── Recent files —— 与设计稿 attachment.html 对齐 ──────────────────────────
 
 const RECENT_FILES = [
-  { name: '项目需求文档.pdf', path: '/Users/alex/Downloads', size: '2.4 MB' },
-  { name: '会议记录-2025-06-01.txt', path: '/Users/alex/Documents', size: '48 KB' },
-  { name: '截图 2025-06-01.png', path: '/Users/alex/Desktop', size: '1.1 MB' },
+  { name: '产品架构图_v2.png', path: '图片 · 2.4 MB', size: '昨天', fileType: 'img' as const },
+  { name: '竞品分析_Q2.pdf', path: 'PDF · 18 页 · 3.1 MB', size: '2 天前', fileType: 'pdf' as const },
+  { name: '用户访谈记录.xlsx', path: '表格 · 24 KB', size: '上周', fileType: 'xls' as const },
 ];
 
-// ── AttachmentSheet ──────────────────────────────────────────────────────────
+// ── AttachmentSheet ────────────────────────────────────────────────────────
 
 export function AttachmentSheet({ visible, onClose, testID }: Props) {
-  const { palette, tokens } = useTheme();
-
   return (
     <BottomSheet visible={visible} title="添加附件" onClose={onClose} testID={testID}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <EntryGrid />
+      <ScrollView
+        style={{ maxHeight: 520 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 12 }}
+      >
+        {/* 4 entry grid */}
+        <View style={styles.entryGrid}>
+          {ENTRIES.map((e) => (
+            <EntryItem key={e.label} entry={e} testID={`entry-${e.label}`} />
+          ))}
+        </View>
 
-        <Text
-          style={{
-            color: palette.fg3,
-            fontSize: tokens.fontSize.xs,
-            fontWeight: '600',
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            marginBottom: 8,
-            marginLeft: 4,
-          }}
-        >
-          最近使用
-        </Text>
-        <View style={{ gap: 8 }}>
+        {/* 最近使用 */}
+        <Text style={styles.sectionLabel}>最近使用</Text>
+        <View style={{ gap: 6 }}>
           {RECENT_FILES.map((f) => (
-            <FileCard key={f.name} name={f.name} path={f.path} size={f.size} />
+            <FileCard
+              key={f.name}
+              name={f.name}
+              path={f.path}
+              size={f.size}
+              fileType={f.fileType}
+            />
           ))}
         </View>
       </ScrollView>
     </BottomSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  entryGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  entry: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+  },
+  entryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: 14,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+});

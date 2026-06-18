@@ -10,18 +10,18 @@ type Props = {
 };
 
 export function Pill({ name, meta, onPress, accessibilityLabel }: Props) {
-  const { palette, tokens } = useTheme();
+  const { palette } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [{ opacity: pressed ? 0.55 : 1 }, { flexDirection: 'row', alignItems: 'center', gap: 5, padding: 6 }]}
       accessibilityLabel={accessibilityLabel ?? `${name} ${meta ?? ''}`}
     >
-      <Text style={{ fontSize: tokens.fontSize.md, fontWeight: '600', color: palette.fg }}>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: palette.fg, letterSpacing: -0.005 }}>
         {name}
       </Text>
       {meta && (
-        <Text style={{ fontSize: tokens.fontSize.sm, fontWeight: '500', color: palette.fg3 }}>
+        <Text style={{ fontSize: 14, fontWeight: '500', color: palette.fg3, letterSpacing: -0.005 }}>
           {meta}
         </Text>
       )}

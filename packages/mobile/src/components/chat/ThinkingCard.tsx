@@ -14,7 +14,7 @@ type Props = {
 export function ThinkingCard({ elapsedSeconds, stepCount, steps, onToggle, isExpanded = false }: Props) {
   const { palette, tokens } = useTheme();
   return (
-    <View style={{ width: '100%' }}>
+    <View style={{ maxWidth: '88%' }}>
       <Pressable
         onPress={onToggle}
         style={({ pressed }) => [
@@ -24,7 +24,8 @@ export function ThinkingCard({ elapsedSeconds, stepCount, steps, onToggle, isExp
             gap: 8,
             backgroundColor: palette.surface,
             borderRadius: 12,
-            padding: 8,
+            paddingVertical: 8,
+            paddingHorizontal: 12,
             opacity: pressed ? 0.55 : 1,
           },
         ]}

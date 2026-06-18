@@ -35,11 +35,13 @@ describe('InputBar', () => {
     expect(input.props.placeholder).toBe('尽管问，带图也行');
   });
 
-  it('right side has vertical stack of PlusButton + SendButton (gap 8)', () => {
+  it('right side has horizontal row of PlusButton + SendButton (gap 8)', () => {
+    // 设计稿 home.html / conversation.html：底部 actions 行水平布局——
+    // 左侧 mic，右侧 plus + send 圆形蓝色填充。
     const { getByTestId, getByLabelText } = render(<InputBar />, { wrapper });
     const rightStack = getByTestId('input-actions-right');
     const flatStyle = require('react-native').StyleSheet.flatten(rightStack.props.style);
-    expect(flatStyle.flexDirection).toBe('column');
+    expect(flatStyle.flexDirection).toBe('row');
     expect(flatStyle.gap).toBe(8);
     expect(getByTestId('plus-button')).toBeTruthy();
     expect(getByLabelText('发送消息')).toBeTruthy();

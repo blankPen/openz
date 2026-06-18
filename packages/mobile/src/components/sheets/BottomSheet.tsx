@@ -1,6 +1,6 @@
 import { Modal, Pressable, View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
-import { IconButton } from '../topbar/IconButton';
+import { Icon } from '../common/Icon';
 
 type Props = {
   visible: boolean;
@@ -10,6 +10,13 @@ type Props = {
   testID?: string;
 };
 
+/**
+ * 通用 Bottom Sheet
+ * 设计稿 model-switch.html / attachment.html：
+ *   - 顶部 40×4 圆角 2px handle bar
+ *   - sheet-head: 8px 18px 12px padding, 17px/700 标题 + 28×28 surface 圆形关闭按钮
+ *   - 阴影: 0 -10px 40px rgba(0,0,0,0.15)
+ */
 export function BottomSheet({ visible, title, onClose, children, testID }: Props) {
   const { palette } = useTheme();
   return (
@@ -30,7 +37,6 @@ export function BottomSheet({ visible, title, onClose, children, testID }: Props
           backgroundColor: palette.bg,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          paddingTop: 8,
           paddingBottom: 20,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -10 },
@@ -45,7 +51,8 @@ export function BottomSheet({ visible, title, onClose, children, testID }: Props
             backgroundColor: palette.surface2,
             borderRadius: 2,
             alignSelf: 'center',
-            marginVertical: 4,
+            marginTop: 8,
+            marginBottom: 4,
           }}
         />
         <View
@@ -59,7 +66,20 @@ export function BottomSheet({ visible, title, onClose, children, testID }: Props
           }}
         >
           <Text style={{ fontSize: 17, fontWeight: '700', color: palette.fg }}>{title}</Text>
-          <IconButton name="close" size={14} onPress={onClose} accessibilityLabel="关闭" />
+          <Pressable
+            onPress={onClose}
+            accessibilityLabel="关闭"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: palette.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name="close" size={14} color={palette.fg2} />
+          </Pressable>
         </View>
         <View style={{ paddingHorizontal: 14 }}>{children}</View>
       </View>

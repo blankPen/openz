@@ -68,7 +68,7 @@ export function MessageRow({ message, onCopy, onLike, onRegenerate, onShare }: P
           steps={message.thinkingSteps}
         />
       )}
-      {message.type !== 'tool-call' && (
+      {message.type !== 'tool-call' && message.type !== 'thinking' && (
         <AIBubble content={message.content} timestamp={message.timestamp} />
       )}
       {message.type === 'tool-call' && message.toolCall && (

@@ -26,6 +26,17 @@ const DEFAULTS: Persisted = {
 };
 
 function loadInitial(): Persisted {
+  // Web 预览模式：从 sessionStorage 读取 mock 数据，方便 chat 组件样式验证
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    const mock = window.sessionStorage.getItem('openz-mock-data');
+    if (mock) {
+      try {
+        return { ...DEFAULTS, ...JSON.parse(mock) };
+      } catch {
+        /* fall through */
+      }
+    }
+  }
   const raw = storage.getString(STORAGE_KEY);
   if (!raw) return DEFAULTS;
   try {

@@ -25,11 +25,11 @@ describe('AttachmentSheet', () => {
     expect(getByText('最近使用')).toBeTruthy();
   });
 
-  it('renders recent file names', () => {
+  it('renders recent file names (设计稿 attachment.html)', () => {
     const { getByText } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
-    expect(getByText('项目需求文档.pdf')).toBeTruthy();
-    expect(getByText('会议记录-2025-06-01.txt')).toBeTruthy();
-    expect(getByText('截图 2025-06-01.png')).toBeTruthy();
+    expect(getByText('产品架构图_v2.png')).toBeTruthy();
+    expect(getByText('竞品分析_Q2.pdf')).toBeTruthy();
+    expect(getByText('用户访谈记录.xlsx')).toBeTruthy();
   });
 
   it('does not render when not visible', () => {
@@ -42,70 +42,41 @@ describe('AttachmentSheet', () => {
     expect(getByTestId('attachment-sheet')).toBeTruthy();
   });
 
-  // TDD color verification tests - these should FAIL until implementation matches spec
-  it('renders 本地图片 entry with correct icon background color #EAF1FF', () => {
-    const { getByLabelText } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
-    const entry = getByLabelText('本地图片');
-    const iconContainer = entry.parent;
-    expect(iconContainer).toBeTruthy();
-    // The entry Pressable has the background color as the icon container bg
-    const style = iconContainer.props.style;
-    // Find the backgroundColor - it should be #EAF1FF for 本地图片
-    const bgColor = findBackgroundColor(style);
-    expect(bgColor?.toUpperCase()).toBe('#EAF1FF');
+  // 设计稿 attachment.html：entry 整体用 surface (#F5F5F7) 背景，
+  // entry 内部有 44×44 圆角 12px 的 icon 容器，其背景色是 entry.bg。
+  it('renders 本地图片 entry icon with background color #EAF1FF', () => {
+    const { getByTestId } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
+    const icon = getByTestId('entry-本地图片-icon');
+    const style = require('react-native').StyleSheet.flatten(icon.props.style);
+    expect(style.backgroundColor?.toUpperCase()).toBe('#EAF1FF');
   });
 
-  it('renders 本地文件 entry with correct icon background color #FFE8DB', () => {
-    const { getByLabelText } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
-    const entry = getByLabelText('本地文件');
-    const iconContainer = entry.parent;
-    expect(iconContainer).toBeTruthy();
-    const style = iconContainer.props.style;
-    const bgColor = findBackgroundColor(style);
-    expect(bgColor?.toUpperCase()).toBe('#FFE8DB');
+  it('renders 本地文件 entry icon with background color #FFE8DB', () => {
+    const { getByTestId } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
+    const icon = getByTestId('entry-本地文件-icon');
+    const style = require('react-native').StyleSheet.flatten(icon.props.style);
+    expect(style.backgroundColor?.toUpperCase()).toBe('#FFE8DB');
   });
 
-  it('renders 拍照 entry with correct icon background color #E1F4E9', () => {
-    const { getByLabelText } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
-    const entry = getByLabelText('拍照');
-    const iconContainer = entry.parent;
-    expect(iconContainer).toBeTruthy();
-    const style = iconContainer.props.style;
-    const bgColor = findBackgroundColor(style);
-    expect(bgColor?.toUpperCase()).toBe('#E1F4E9');
+  it('renders 拍照 entry icon with background color #E1F4E9', () => {
+    const { getByTestId } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
+    const icon = getByTestId('entry-拍照-icon');
+    const style = require('react-native').StyleSheet.flatten(icon.props.style);
+    expect(style.backgroundColor?.toUpperCase()).toBe('#E1F4E9');
   });
 
-  it('renders 引用回复 entry with correct icon background color #F0E7FE', () => {
-    const { getByLabelText } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
-    const entry = getByLabelText('引用回复');
-    const iconContainer = entry.parent;
-    expect(iconContainer).toBeTruthy();
-    const style = iconContainer.props.style;
-    const bgColor = findBackgroundColor(style);
-    expect(bgColor?.toUpperCase()).toBe('#F0E7FE');
+  it('renders 引用回复 entry icon with background color #F0E7FE', () => {
+    const { getByTestId } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
+    const icon = getByTestId('entry-引用回复-icon');
+    const style = require('react-native').StyleSheet.flatten(icon.props.style);
+    expect(style.backgroundColor?.toUpperCase()).toBe('#F0E7FE');
   });
 
-  it('renders recent files section with file cards', () => {
+  it('renders recent files section with file cards (设计稿)', () => {
     const { getByText } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
-    // Verify 3 file cards exist
-    expect(getByText('项目需求文档.pdf')).toBeTruthy();
-    expect(getByText('会议记录-2025-06-01.txt')).toBeTruthy();
-    expect(getByText('截图 2025-06-01.png')).toBeTruthy();
+    // 设计稿 3 个文件卡片
+    expect(getByText('产品架构图_v2.png')).toBeTruthy();
+    expect(getByText('竞品分析_Q2.pdf')).toBeTruthy();
+    expect(getByText('用户访谈记录.xlsx')).toBeTruthy();
   });
 });
-
-// Helper to extract backgroundColor from nested style arrays
-function findBackgroundColor(style: any): string | undefined {
-  if (!style) return undefined;
-  if (Array.isArray(style)) {
-    for (const s of style) {
-      const found = findBackgroundColor(s);
-      if (found) return found;
-    }
-    return undefined;
-  }
-  if (style && typeof style === 'object' && style.backgroundColor) {
-    return style.backgroundColor;
-  }
-  return undefined;
-}

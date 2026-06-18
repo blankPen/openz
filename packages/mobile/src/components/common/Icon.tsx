@@ -6,7 +6,8 @@ export type IconName =
   | 'check' | 'chevDown' | 'chevUp' | 'send' | 'copy' | 'like' | 'regenerate' | 'share'
   | 'flash' | 'cube' | 'globe' | 'web' | 'lawyer' | 'fire' | 'phd'
   | 'help' | 'info' | 'sparkles' | 'bell' | 'gear' | 'logout' | 'textSize' | 'lang'
-  | 'menu' | 'model' | 'search' | 'file' | 'star' | 'chart';
+  | 'menu' | 'model' | 'search' | 'file' | 'star' | 'chart'
+  | 'robot' | 'spark' | 'pptGrid' | 'chartEkg' | 'globe2';
 
 type Props = { name: IconName; size?: number; color: string; testID?: string; style?: object };
 
@@ -55,5 +56,15 @@ export function Icon({ name, size = 22, color, testID, style }: Props) {
     case 'logout': return <Svg {...props}><Path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><Polyline points="16 17 21 12 16 7" /><Line x1={21} y1={12} x2={9} y2={12} /></Svg>;
     case 'textSize': return <Svg {...props}><Path d="M4 7V4h16v3" /><Path d="M9 20h6" /><Path d="M12 4v16" /></Svg>;
     case 'lang': return <Svg {...props}><Circle cx={12} cy={12} r={10} /><Line x1={2} y1={12} x2={22} y2={12} /><Path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" /></Svg>;
+    // Robot face —— 设计稿 settings.html "默认模型" 菜单项
+    case 'robot': return <Svg {...props}><Rect x={5} y={8} width={14} height={11} rx={2} /><Circle cx={9} cy={13} r={1.2} /><Circle cx={15} cy={13} r={1.2} /><Path d="M12 4v4" /><Circle cx={12} cy={3} r={1.2} /></Svg>;
+    // Sun rays + center circle —— 设计稿 home.html "通用 Agent" 工具图标
+    case 'spark': return <Svg {...props} strokeWidth={1.8}><Circle cx={12} cy={12} r={3} /><Path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m7.07 7.07l4.25 4.25M1 12h6m6 0h6M4.22 19.78l4.24-4.24m7.07-7.07l4.25-4.25" /></Svg>;
+    // 4-cell grid (PPT slide) —— 设计稿 home.html "一键 PPT"
+    case 'pptGrid': return <Svg {...props} strokeWidth={1.8}><Rect x={3} y={3} width={18} height={18} rx={2} /><Line x1={3} y1={9} x2={21} y2={9} /><Line x1={9} y1={3} x2={9} y2={21} /></Svg>;
+    // EKG / heart-rate line —— 设计稿 home.html "健康助手"
+    case 'chartEkg': return <Svg {...props}><Path d="M22 12h-4l-3 9L9 3l-3 9H2" /></Svg>;
+    // Globe with longitude/latitude —— fallback for agent
+    case 'globe2': return <Svg {...props}><Circle cx={12} cy={12} r={10} /><Line x1={2} y1={12} x2={22} y2={12} /><Path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" /></Svg>;
   }
 }

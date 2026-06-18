@@ -10,9 +10,12 @@ type Props = {
   isExpanded?: boolean; // default false
 };
 
-export function ToolCallCard({ toolCall, onToggle, isExpanded = false }: Props) {
+export function ToolCallCard({ toolCall, onToggle, isExpanded = true }: Props) {
   const { palette, tokens } = useTheme();
   const sourceCount = toolCall.sources?.length ?? 0;
+  // 设计稿：name 自动拼接 "· X 个来源" 后缀，避免与 name 重复
+  const nameAlreadyHasCount = /·\s*\d+\s*个来源/.test(toolCall.name);
+  const displayName = nameAlreadyHasCount ? toolCall.name : `${toolCall.name}${sourceCount > 0 ? ` · ${sourceCount} 个来源` : ''}`;
 
   return (
     <View
@@ -32,7 +35,8 @@ export function ToolCallCard({ toolCall, onToggle, isExpanded = false }: Props) 
             flexDirection: 'row',
             alignItems: 'center',
             gap: 10,
-            padding: 10,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
             backgroundColor: pressed ? palette.surface : 'transparent',
           },
         ]}
@@ -56,8 +60,7 @@ export function ToolCallCard({ toolCall, onToggle, isExpanded = false }: Props) 
             style={{ fontSize: tokens.fontSize.sm, fontWeight: '600', color: palette.fg }}
             numberOfLines={1}
           >
-            {toolCall.name}
-            {sourceCount > 0 && ` · ${sourceCount} 个来源`}
+            {displayName}
           </Text>
           <Text
             style={{ fontSize: tokens.fontSize.xs, color: palette.fg3, marginTop: 1 }}
@@ -66,14 +69,16 @@ export function ToolCallCard({ toolCall, onToggle, isExpanded = false }: Props) 
             {toolCall.description}
           </Text>
         </View>
-        <View style={{ transform: [{ rotate: isExpanded ? '180deg' : '-90deg' }] }}>
+        <View style={{ transform: [{ rotate: isExpanded ? '0deg' : '-90deg' }] }}>
           <Icon name="chevDown" size={14} color={palette.fg3} />
         </View>
       </Pressable>
       {isExpanded && toolCall.sources && toolCall.sources.length > 0 && (
-        <View style={{ borderTopWidth: 1, borderTopColor: palette.border, padding: 8 }}>
-          {toolCall.sources.map((source) => (
-            <SourceItem key={source.index} index={source.index} title={source.title} url={source.url} />
+        <View style={{ borderTopWidth: 1, borderTopColor: palette.border, paddingVertical: 8, paddingHorizontal: 12 }}>
+          {toolCall.sources.map((source, i) => (
+            <View key={source.index} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: palette.surface }}>
+              <SourceItem index={source.index} title={source.title} url={source.url} />
+            </View>
           ))}
         </View>
       )}
