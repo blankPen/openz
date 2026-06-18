@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Modal,
   Pressable,
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
 } from 'react-native';
@@ -92,6 +93,15 @@ export function SettingsDrawer({ visible, onClose, testID }: Props) {
   const setEnterToSend = useSettingsStore((s) => s.setEnterToSend);
   const fontSize = useSettingsStore((s) => s.fontSize);
   const language = useSettingsStore((s) => s.language);
+  const serverUrl = useSettingsStore((s) => s.serverUrl);
+  const setServerUrl = useSettingsStore((s) => s.setServerUrl);
+  const [serverUrlDraft, setServerUrlDraft] = useState(serverUrl);
+  useEffect(() => {
+    setServerUrlDraft(serverUrl);
+  }, [serverUrl]);
+  const saveServerUrl = () => {
+    setServerUrl(serverUrlDraft.trim());
+  };
 
   useEffect(() => {
     Animated.parallel([
@@ -156,6 +166,42 @@ export function SettingsDrawer({ visible, onClose, testID }: Props) {
             <View>
               <MenuItem icon="textSize" label="字体大小" value={fontSizeLabel + ' ›'} />
               <MenuItem icon="lang" label="语言" value={languageLabel + ' ›'} />
+            </View>
+          </Section>
+
+          {/* Section 1.5: 连接 —— daemon serverUrl 编辑 */}
+          <Section title="连接">
+            <View style={styles.serverUrlBlock}>
+              <Text style={[styles.serverUrlLabel, { color: palette.fg3 }]}>Daemon URL</Text>
+              <TextInput
+                value={serverUrlDraft}
+                onChangeText={setServerUrlDraft}
+                placeholder="http://localhost:19999"
+                placeholderTextColor={palette.fg3}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                style={[
+                  styles.serverUrlInput,
+                  { color: palette.fg, borderColor: palette.border, backgroundColor: palette.surface },
+                ]}
+                testID="server-url-input"
+                onSubmitEditing={saveServerUrl}
+                returnKeyType="done"
+              />
+              <Pressable
+                onPress={saveServerUrl}
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  { backgroundColor: pressed ? palette.primarySoft : palette.primary },
+                ]}
+                testID="server-url-save"
+              >
+                <Text style={styles.saveBtnText}>保存</Text>
+              </Pressable>
+              <Text style={[styles.serverUrlHint, { color: palette.fg3 }]}>
+                当前: {serverUrl || '(未配置)'}
+              </Text>
             </View>
           </Section>
 
@@ -285,4 +331,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   logoutText: { fontWeight: '600' },
+  serverUrlBlock: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  serverUrlLabel: { fontSize: 12, fontWeight: '600' },
+  serverUrlInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  saveBtn: {
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveBtnText: { color: '#fff', fontWeight: '600' },
+  serverUrlHint: { fontSize: 11 },
 });
