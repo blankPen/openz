@@ -11,7 +11,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:tts": "node -e \"import('@openz/speech/server').then(m=>{const k=process.env.OPENZ_TTS_APPKEY||'d098393c-32be-4b38-9814-c85da94dc6c6';const s=m.bidirectionTtsStream({appkey:k,resourceId:'seed-tts-2.0',voiceType:'saturn_zh_female_aojiaonvyou_tob',texts:['你好，测试流式合成。'],encoding:'pcm',sampleRate:24000});let f=0;s.on('data',c=>f++);s.on('end',()=>{console.log('PASS:',f,'frames');process.exit(0)});s.on('error',e=>{console.log('FAIL:',e.message);process.exit(1)})})\""
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.178",

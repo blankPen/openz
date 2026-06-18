@@ -125,6 +125,34 @@ export class TTSManager {
   }
 
   /**
+   * 发送单段文本的 TaskRequest（不启动完整的流式循环）。
+   * 用于逐段推送文本到 TTS 引擎。
+   */
+  async feedText(text: string): Promise<void> {
+    if (!this.ws || !this.sessionId || !this.connected) {
+      throw new Error('not connected');
+    }
+    await TaskRequest(
+      this.ws,
+      new TextEncoder().encode(
+        JSON.stringify({
+          user: { uid: 'openz-daemon' },
+          req_params: {
+            speaker: this.opts.voiceType,
+            audio_params: {
+              format: 'pcm',
+              sample_rate: 24000,
+            },
+            text,
+          },
+          event: EventType.TaskRequest,
+        }),
+      ),
+      this.sessionId,
+    );
+  }
+
+  /**
    * Run the full bidirectional TTS cycle:
    * - sender: pulls text chunks and sends TaskRequest
    * - receiver: collects audio frames and calls onAudio

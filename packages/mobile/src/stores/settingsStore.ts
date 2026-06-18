@@ -16,6 +16,12 @@ type Persisted = {
   voiceBroadcast: boolean;
   enterToSend: boolean;
   defaultModel: string;
+  /**
+   * 是否自动播报 TTS。
+   * 关闭时,useTtsClient 的 speak() 立即返回不发请求,
+   * 方便用户静音 / 节省流量。
+   */
+  ttsAutoPlay: boolean;
 };
 
 const DEFAULTS: Persisted = {
@@ -26,6 +32,7 @@ const DEFAULTS: Persisted = {
   voiceBroadcast: true,
   enterToSend: true,
   defaultModel: 'OpenZ Z1',
+  ttsAutoPlay: true,
 };
 
 function loadInitial(): Persisted {
@@ -46,6 +53,7 @@ type SettingsState = Persisted & {
   setVoiceBroadcast: (v: boolean) => void;
   setEnterToSend: (v: boolean) => void;
   setDefaultModel: (v: string) => void;
+  setTtsAutoPlay: (v: boolean) => void;
 };
 
 function persist(state: Persisted) {
@@ -59,6 +67,7 @@ function persist(state: Persisted) {
       voiceBroadcast: state.voiceBroadcast,
       enterToSend: state.enterToSend,
       defaultModel: state.defaultModel,
+      ttsAutoPlay: state.ttsAutoPlay,
     }),
   );
 }
@@ -91,6 +100,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   setDefaultModel: (v) => {
     set({ defaultModel: v });
+    persist(get());
+  },
+  setTtsAutoPlay: (v) => {
+    set({ ttsAutoPlay: v });
     persist(get());
   },
 }));
