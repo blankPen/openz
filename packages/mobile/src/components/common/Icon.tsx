@@ -7,7 +7,8 @@ export type IconName =
   | 'flash' | 'cube' | 'globe' | 'web' | 'lawyer' | 'fire' | 'phd'
   | 'help' | 'info' | 'sparkles' | 'bell' | 'gear' | 'logout' | 'textSize' | 'lang'
   | 'menu' | 'model' | 'search' | 'file' | 'star' | 'chart'
-  | 'robot' | 'spark' | 'pptGrid' | 'chartEkg' | 'globe2';
+  | 'robot' | 'spark' | 'pptGrid' | 'chartEkg' | 'globe2'
+  | 'history' | 'trash';
 
 type Props = { name: IconName; size?: number; color: string; testID?: string; style?: object };
 
@@ -66,5 +67,9 @@ export function Icon({ name, size = 22, color, testID, style }: Props) {
     case 'chartEkg': return <Svg {...props}><Path d="M22 12h-4l-3 9L9 3l-3 9H2" /></Svg>;
     // Globe with longitude/latitude —— fallback for agent
     case 'globe2': return <Svg {...props}><Circle cx={12} cy={12} r={10} /><Line x1={2} y1={12} x2={22} y2={12} /><Path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" /></Svg>;
+    // Clock / history icon for history sessions list
+    case 'history': return <Svg {...props}><Circle cx={12} cy={12} r={10} /><Polyline points="12 6 12 12 16 14" /></Svg>;
+    // Trash icon for delete session
+    case 'trash': return <Svg {...props}><Polyline points="3 6 5 6 21 6" /><Path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></Svg>;
   }
 }

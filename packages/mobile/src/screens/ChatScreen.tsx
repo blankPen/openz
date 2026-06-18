@@ -23,15 +23,11 @@ import { StreamingIndicator } from '../components/chat/StreamingIndicator';
 import { InputBar } from '../components/input/InputBar';
 import { IconButton } from '../components/topbar/IconButton';
 import { Pill } from '../components/common/Pill';
-import { SettingsDrawer } from '../components/drawer/SettingsDrawer';
+import { HistoryDrawer } from '../components/drawer/HistoryDrawer';
 import { ModelSwitchSheet } from '../components/sheets/ModelSwitchSheet';
 import { AttachmentSheet } from '../components/sheets/AttachmentSheet';
+import { sessionToConvMap, convToSessionMap } from '../lib/sessionMaps';
 import type { AgentEvent } from '@openz/shared';
-
-/** 映射 daemon session.id → 本地 conversation.id */
-const sessionToConvMap = new Map<string, string>();
-/** 映射本地 conversation.id → daemon session.id */
-const convToSessionMap = new Map<string, string>();
 
 /**
  * OpenZ 聊天屏幕（接入 daemon 后端）
@@ -383,7 +379,7 @@ export function ChatScreen() {
 
       <View style={{ height: insets.bottom, backgroundColor: palette.bg }} />
 
-      <SettingsDrawer visible={drawerVisible} onClose={handleDrawerClose} testID="settings-drawer" />
+      <HistoryDrawer visible={drawerVisible} onClose={handleDrawerClose} onNewChat={handleNewChat} testID="history-drawer" />
       <ModelSwitchSheet
         visible={modelSheetVisible}
         onClose={closeModelSheet}

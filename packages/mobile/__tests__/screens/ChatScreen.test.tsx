@@ -200,10 +200,10 @@ describe('ChatScreen', () => {
     expect(getByLabelText('新对话')).toBeTruthy();
   });
 
-  it('SettingsDrawer mounts and renders when drawerVisible is true', () => {
+  it('HistoryDrawer mounts and renders when drawerVisible is true', () => {
     useSheetStore.setState({ drawerVisible: true });
     const { getByTestId, getAllByText } = render(<ChatScreen />, { wrapper });
-    expect(getByTestId('settings-drawer')).toBeTruthy();
+    expect(getByTestId('history-drawer')).toBeTruthy();
     // "Alex" 同时出现在 WelcomeSection 和 SettingsDrawer user card,使用 getAllByText
     expect(getAllByText('Alex').length).toBeGreaterThanOrEqual(1);
   });
