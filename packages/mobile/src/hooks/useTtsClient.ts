@@ -21,6 +21,12 @@ import { PCMPlayer } from '../lib/audio-player';
 import { useSettingsStore } from '../stores/settingsStore';
 // 注意:toastStore 由其他 agent 实现,这里暂时不直接依赖。
 
+/** 日志开关 */
+const LOG_ENABLED = true;
+const log = (...args: unknown[]) => {
+  if (LOG_ENABLED) console.log('[mobile/tts]', ...args);
+};
+
 export interface UseTtsClientOptions {
   /** 收到 message 时同步触发(让 UI 也能渲染文字) */
   onText?: (sessionId: string, message: string) => void;
@@ -98,13 +104,13 @@ export function useTtsClient(options: UseTtsClientOptions = {}): TtsClient {
       try {
         player.enqueue(data);
       } catch (e) {
-        // enqueue 异常:不抛,只 toast 一下避免静音
-        console.warn('[useTtsClient]',`TTS enqueue failed: ${(e as Error).message}`);
+        log('✗ enqueue failed:', (e as Error).message);
       }
     };
 
     const onEvent = (ev: { type: string; error?: string }) => {
       const { type } = ev;
+      log('  tts:event', type, ev.error ?? '');
       // chunk / first_frame 不改变 isPlaying;end / error 终止
       if (type === 'end' || type === 'error') {
         if (type === 'error' && ev.error) {
@@ -160,9 +166,12 @@ export function useTtsClient(options: UseTtsClientOptions = {}): TtsClient {
       // 读最新的 ttsAutoPlay 设置
       const ttsAutoPlay = useSettingsStore.getState().ttsAutoPlay;
       if (!ttsAutoPlay) {
+        log('speak: ttsAutoPlay=false, 跳过 tts:start (text 仍通过 onText 渲染)');
         // 关闭自动播报:不发请求
         return;
       }
+
+      log('→ emit tts:start sessionId=', sessionId, 'message_len=', message.length);
 
       // 解除旧订阅再开始新一次
       teardown();
@@ -196,7 +205,7 @@ export function useTtsClient(options: UseTtsClientOptions = {}): TtsClient {
           }
         );
       } catch (e) {
-        console.error('[useTtsClient]',`TTS 发送失败: ${(e as Error).message}`);
+        log('✗ tts:start emit failed:', (e as Error).message);
         setIsPlaying(false);
       }
     },
