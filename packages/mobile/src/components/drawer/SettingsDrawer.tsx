@@ -39,7 +39,7 @@ function MenuItem({ icon, label, value, switchValue, onSwitchChange, onPress, da
       onPress={onPress}
       style={({ pressed }) => [
         styles.menuItem,
-        { opacity: pressed ? 0.6 : 1, backgroundColor: palette.surface },
+        { backgroundColor: pressed ? palette.surface : 'transparent' },
       ]}
       accessibilityRole={onSwitchChange ? 'switch' : 'button'}
     >
@@ -181,8 +181,18 @@ export function SettingsDrawer({ visible, onClose, testID }: Props) {
 
           {/* Section 1: 通用 */}
           <Section title="通用">
-            <MenuItem icon="sun" label="外观" value={themeMode === 'light' ? '浅色' : themeMode === 'dark' ? '深色' : '自动'} />
-            <ThemeToggle value={themeMode} onChange={setThemeMode} />
+            {/* 外观行：icon + label + inline ThemeToggle */}
+            <Pressable
+              onPress={() => {}}
+              style={({ pressed }) => [
+                styles.menuItem,
+                { backgroundColor: pressed ? palette.surface : 'transparent' },
+              ]}
+            >
+              <Icon name="sun" size={18} color={palette.fg3} />
+              <Text style={[styles.menuLabel, { color: palette.fg, fontSize: tokens.fontSize.md }]}>外观</Text>
+              <ThemeToggle value={themeMode} onChange={setThemeMode} />
+            </Pressable>
             <MenuItem icon="textSize" label="字体大小" value={fontSizeLabel} />
             <MenuItem icon="lang" label="语言" value={languageLabel} />
           </Section>
@@ -223,7 +233,7 @@ export function SettingsDrawer({ visible, onClose, testID }: Props) {
             onPress={() => {}}
             style={({ pressed }) => [
               styles.logoutBtn,
-              { opacity: pressed ? 0.6 : 1, backgroundColor: palette.surface },
+              { backgroundColor: pressed ? palette.surface : 'transparent' },
             ]}
             accessibilityRole="button"
           >
@@ -256,7 +266,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     marginBottom: 24,
   },
   userInfo: { flex: 1 },
@@ -278,7 +288,6 @@ const styles = StyleSheet.create({
   sectionBody: {
     borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   menuItem: {
     flexDirection: 'row',

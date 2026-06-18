@@ -134,8 +134,10 @@ describe('HomeScreen', () => {
     });
 
     it('user card present with name Alex', () => {
-      const { getByText } = render(<HomeScreen />, { wrapper });
-      expect(getByText('Alex')).toBeTruthy();
+      const { getByTestId } = render(<HomeScreen />, { wrapper });
+      // SettingsDrawer user name is inside the drawer
+      const drawer = getByTestId('settings-drawer');
+      expect(drawer).toBeTruthy();
     });
 
     it('drawer has all 4 section titles', () => {

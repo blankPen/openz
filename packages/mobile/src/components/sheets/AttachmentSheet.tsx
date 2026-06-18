@@ -29,19 +29,17 @@ const ENTRIES: Entry[] = [
 function EntryGrid() {
   const { palette, tokens } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+    <View style={{ flexDirection: 'row', marginBottom: 20 }}>
       {ENTRIES.map((e) => (
         <Pressable
           key={e.label}
           onPress={() => {}}
           style={({ pressed }) => [
             {
-              width: '47%',
-              flexDirection: 'row',
+              flex: 1,
               alignItems: 'center',
-              gap: 10,
+              gap: 6,
               paddingVertical: 14,
-              paddingHorizontal: 12,
               borderRadius: 12,
               backgroundColor: e.bg,
               opacity: pressed ? 0.6 : 1,
@@ -50,8 +48,10 @@ function EntryGrid() {
           accessibilityRole="button"
           accessibilityLabel={e.label}
         >
-          <Icon name={e.icon as any} size={20} color={e.color} />
-          <Text style={{ color: palette.fg, fontSize: tokens.fontSize.md, fontWeight: '600' }}>
+          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: e.bg, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={e.icon as any} size={22} color={e.color} />
+          </View>
+          <Text style={{ color: palette.fg, fontSize: tokens.fontSize.xs, fontWeight: '500' }}>
             {e.label}
           </Text>
         </Pressable>
@@ -89,7 +89,7 @@ export function AttachmentSheet({ visible, onClose, testID }: Props) {
             marginLeft: 4,
           }}
         >
-          最近文件
+          最近使用
         </Text>
         <View style={{ gap: 8 }}>
           {RECENT_FILES.map((f) => (

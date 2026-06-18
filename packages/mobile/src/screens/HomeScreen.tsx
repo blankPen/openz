@@ -104,7 +104,7 @@ export function HomeScreen() {
         ]}
       >
         <IconButton name="burger" accessibilityLabel="打开菜单" onPress={handleMenuPress} />
-        <Pill name="Z1" meta="思考" onPress={handlePillPress} accessibilityLabel="切换模型" />
+        <Pill name="OpenZ" meta="Z1 思考" onPress={handlePillPress} accessibilityLabel="切换模型" />
         <IconButton name="voice" accessibilityLabel="语音输入" onPress={handleVoice} />
         <IconButton name="phone" accessibilityLabel="拨打" onPress={handleCall} />
         <IconButton name="plus" accessibilityLabel="新对话" onPress={handleNewChat} />
@@ -112,7 +112,7 @@ export function HomeScreen() {
 
       {/* Main content */}
       <View style={styles.content}>
-        <WelcomeSection name="Zhang San" subtitle="有什么可以帮你的？" />
+        <WelcomeSection name="Alex" subtitle="有什么可以帮你的？" />
         <ToolsStrip />
       </View>
 

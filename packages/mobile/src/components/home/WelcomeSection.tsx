@@ -52,8 +52,8 @@ export function WelcomeSection({ name, subtitle, style }: Props) {
         }}
         testID="welcome-greeting"
       >
-        嗨 {name}，今天要和{' '}
-        <Text style={{ color: palette.primary }}>OpenAI</Text>
+        嗨 <Text style={{ color: palette.primary }}>{name}</Text>，今天要和{' '}
+        <Text style={{ color: palette.primary }}>OpenZ</Text>
         {' 一起做点什么？'}
       </Text>
     </View>

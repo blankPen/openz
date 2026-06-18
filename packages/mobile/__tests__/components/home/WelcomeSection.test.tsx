@@ -73,7 +73,7 @@ describe('WelcomeSection', () => {
           const found = findOpenAI(c);
           if (found) return found;
         }
-      } else if (typeof content === 'object' && content?.props?.children === 'OpenAI') {
+      } else if (typeof content === 'object' && content?.props?.children === 'OpenZ') {
         return content;
       }
       return null;

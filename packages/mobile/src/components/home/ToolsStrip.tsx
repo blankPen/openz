@@ -4,7 +4,7 @@ import { Icon } from '../common/Icon';
 
 export type Tool = {
   name: string;
-  icon: 'search' | 'flash' | 'globe' | 'lawyer' | 'fire' | 'phd' | 'doc' | 'sparkles';
+  icon: 'search' | 'flash' | 'globe' | 'lawyer' | 'fire' | 'phd' | 'doc' | 'sparkles' | 'cube';
   iconBg: string;
   iconColor: string;
   isPrimary?: boolean;
@@ -16,10 +16,10 @@ type Props = {
 };
 
 const DEFAULT_TOOLS: Tool[] = [
-  { name: '通用 Agent', icon: 'sparkles', iconBg: '#EAF1FF', iconColor: '#1A66FF', isPrimary: true },
+  { name: '通用 Agent', icon: 'globe', iconBg: '#EAF1FF', iconColor: '#1A66FF', isPrimary: true },
   { name: '一键 PPT', icon: 'doc', iconBg: '#FFE8DB', iconColor: '#FF7A45' },
-  { name: 'OpenZ Claw', icon: 'sparkles', iconBg: '#F0E7FE', iconColor: '#8B5CF6' },
-  { name: '健康助手', icon: 'sparkles', iconBg: '#E1F4E9', iconColor: '#34A853' },
+  { name: 'OpenZ Claw', icon: 'cube', iconBg: '#F0E7FE', iconColor: '#8B5CF6' },
+  { name: '健康助手', icon: 'flash', iconBg: '#E1F4E9', iconColor: '#34A853' },
 ];
 
 export function ToolsStrip({ tools = DEFAULT_TOOLS }: Props) {

@@ -22,7 +22,7 @@ describe('AttachmentSheet', () => {
 
   it('renders recent files section', () => {
     const { getByText } = render(<AttachmentSheet visible onClose={jest.fn()} />, { wrapper });
-    expect(getByText('最近文件')).toBeTruthy();
+    expect(getByText('最近使用')).toBeTruthy();
   });
 
   it('renders recent file names', () => {
