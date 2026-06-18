@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Voice reply**: `session:voice_reply` event with streaming TTS, sends `voice_audio` chunks to client
 - **useAudioPlayer hook**: Web Audio API hook for playing voice audio in browser
 - Voice reply toggle button (🔊/🔇) in ChatView
+- **XDG config**: `~/.config/openz/setting.json` for daemon global configuration
+- **TtsSink abstraction**: Unified PCM frame and control event downstream dispatch
 
 ### Changed
 - Package rename: `@uran/*` → `@openz/*` for consistency

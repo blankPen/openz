@@ -89,6 +89,7 @@
 - `daemon/server.ts` — Socket.IO 服务器，端口 19999
 - `daemon/session.ts` — SessionManager，会话生命周期
 - `daemon/types.ts` — DaemonState、端口配置
+- `daemon/config.ts` — XDG 配置加载，支持 `~/.config/openz/setting.json`
 - `agents/mod.ts` — Agent 接口定义
 - `agents/claude.ts` — ClaudeAgent 实现
 - `daemon/volcengine/ttsManager.ts` — TTSManager，Volcengine TTS 集成
@@ -131,7 +132,7 @@ React 前端：
 
 - **间隔**：30 秒
 - **超时**：90 秒无响应认为 Daemon 离线
-- **事件**：`daemon:ping`（Daemon → Server）、`daemon:pong`（Server → Daemon）
+- **事件**：`daemon:ping`（Server → Daemon）、`daemon:pong`（Daemon → Server）
 
 ## 负载均衡策略
 
