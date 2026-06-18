@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "web-settings.html",
+  "entry": "web-settings.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-06-18T03:24:39.434Z",
+  "updatedAt": "2026-06-18T03:24:39.434Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

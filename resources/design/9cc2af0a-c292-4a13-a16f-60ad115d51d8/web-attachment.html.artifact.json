@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "web-attachment.html",
+  "entry": "web-attachment.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-06-18T03:26:11.860Z",
+  "updatedAt": "2026-06-18T03:26:11.860Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

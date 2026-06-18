@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "web-model-switch.html",
+  "entry": "web-model-switch.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-06-18T03:25:28.665Z",
+  "updatedAt": "2026-06-18T03:25:28.665Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

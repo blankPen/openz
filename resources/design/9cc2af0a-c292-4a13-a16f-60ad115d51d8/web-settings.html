@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZ · 设置（Web 桌面版）</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F5F5F7;
+    --surface-2: #EDEDF0;
+    --surface-3: #FAFAFA;
+    --border: #E5E5EA;
+    --border-soft: #F0F0F2;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-2: #1452CC;
+    --primary-soft: #EAF1FF;
+    --grad-blue: linear-gradient(135deg, #1A66FF 0%, #4A8BFF 100%);
+    --success: #34A853;
+    --warn: #FF7A45;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --radius-pill: 9999px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: #ECECF1;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+  }
+  button { font-family: var(--font); cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+
+  .app {
+    display: flex; height: 100vh;
+    max-width: 1440px; margin: 0 auto;
+    background: var(--bg);
+    box-shadow: 0 0 60px rgba(0,0,0,0.05);
+  }
+
+  /* === Main Sidebar (240px) === */
+  .sidebar {
+    width: 240px; flex-shrink: 0;
+    background: var(--surface-3);
+    border-right: 1px solid var(--border-soft);
+    display: flex; flex-direction: column;
+    padding: 14px 10px 10px;
+  }
+  .sidebar-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 6px 14px;
+  }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+  .logo-icon {
+    width: 24px; height: 24px;
+    background: var(--grad-blue); border-radius: 7px;
+    color: white; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sidebar-toggle {
+    width: 28px; height: 28px; background: transparent; border: none;
+    border-radius: 6px; color: var(--fg-3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sidebar-toggle:hover { background: var(--surface); color: var(--fg); }
+  .sidebar-toggle svg { width: 16px; height: 16px; }
+  .new-chat {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 12px;
+    background: var(--primary); color: white;
+    border: none; border-radius: var(--radius);
+    font-size: 13.5px; font-weight: 600;
+    margin-bottom: 12px;
+    transition: background 150ms ease;
+  }
+  .new-chat:hover { background: var(--primary-2); }
+  .new-chat svg { width: 16px; height: 16px; }
+  .search { position: relative; margin-bottom: 14px; }
+  .search input {
+    width: 100%; padding: 7px 10px 7px 32px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 12.5px; color: var(--fg);
+    outline: none;
+  }
+  .search input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,102,255,0.1); }
+  .search input::placeholder { color: var(--fg-3); }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--fg-3); }
+  .search-icon svg { width: 14px; height: 14px; }
+  .sidebar-nav { flex: 1; overflow-y: auto; }
+  .nav-section { margin-bottom: 14px; }
+  .nav-section-title {
+    padding: 6px 8px 4px;
+    font-size: 11px; font-weight: 600; color: var(--fg-3);
+    letter-spacing: 0.04em;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 8px; border-radius: 7px;
+    color: var(--fg-2); font-size: 13px;
+    cursor: pointer; transition: background 120ms ease;
+  }
+  .nav-item:hover { background: var(--surface); color: var(--fg); }
+  .nav-item .icon { width: 15px; height: 15px; color: currentColor; flex-shrink: 0; }
+  .nav-item .text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-group { margin-bottom: 4px; }
+  .project-header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 8px; font-size: 12.5px; font-weight: 600; color: var(--fg-2);
+    border-radius: 7px; cursor: pointer;
+  }
+  .project-header:hover { background: var(--surface); }
+  .project-header .icon { width: 14px; height: 14px; color: var(--fg-3); }
+  .project-header .count { color: var(--fg-3); font-weight: 400; font-size: 11px; }
+  .project-header .chev { margin-left: auto; width: 12px; height: 12px; color: var(--fg-3); transition: transform 200ms ease; }
+  .project-group.collapsed .chev { transform: rotate(-90deg); }
+  .project-group.collapsed .project-children { display: none; }
+  .project-children { padding-left: 22px; }
+  .sidebar-footer {
+    padding: 10px 6px 4px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .user-avatar {
+    width: 30px; height: 30px;
+    background: var(--grad-blue); border-radius: 50%;
+    color: white; font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 12.5px; font-weight: 500; }
+  .user-plan { font-size: 10.5px; color: var(--primary); font-weight: 500; }
+  .icon-btn {
+    width: 28px; height: 28px; background: transparent; border: none;
+    border-radius: 6px; color: var(--fg-3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { background: var(--surface); color: var(--fg); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  /* === Settings layout: Sub-nav + Content === */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .settings-topbar {
+    height: 56px; display: flex; align-items: center;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+  }
+  .settings-topbar h1 { font-size: 17px; font-weight: 600; }
+
+  .settings-body {
+    flex: 1; display: flex;
+    overflow: hidden;
+  }
+  .settings-nav {
+    width: 220px; flex-shrink: 0;
+    padding: 24px 16px;
+    border-right: 1px solid var(--border-soft);
+    background: var(--surface-3);
+    overflow-y: auto;
+  }
+  .settings-nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--fg-2);
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: background 120ms ease;
+  }
+  .settings-nav-item:hover { background: var(--bg); }
+  .settings-nav-item.active {
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-weight: 500;
+  }
+  .settings-nav-item .icon { width: 16px; height: 16px; }
+  .settings-nav-divider {
+    height: 1px; background: var(--border-soft);
+    margin: 12px 8px;
+  }
+
+  .settings-content {
+    flex: 1; overflow-y: auto;
+    padding: 32px 48px 48px;
+  }
+  .settings-content-inner { max-width: 720px; }
+
+  .settings-section { margin-bottom: 32px; }
+  .settings-section h2 {
+    font-size: 12.5px; font-weight: 600;
+    color: var(--fg-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+
+  .settings-card {
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .settings-row {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row-info { flex: 1; min-width: 0; }
+  .settings-row-title {
+    font-size: 14px; font-weight: 500; color: var(--fg);
+    margin-bottom: 2px;
+  }
+  .settings-row-desc {
+    font-size: 12.5px; color: var(--fg-3); line-height: 1.4;
+  }
+  .settings-row-action { flex-shrink: 0; }
+
+  /* Account card */
+  .account-card {
+    display: flex; align-items: center; gap: 16px;
+    padding: 20px 18px;
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+  }
+  .account-avatar {
+    width: 56px; height: 56px;
+    background: var(--grad-blue); border-radius: 50%;
+    color: white; font-size: 22px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .account-info { flex: 1; }
+  .account-name { font-size: 17px; font-weight: 600; }
+  .account-email { font-size: 13px; color: var(--fg-3); margin-top: 2px; }
+  .account-plan {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 6px;
+    padding: 2px 8px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: 11.5px; font-weight: 600;
+    border-radius: 4px;
+  }
+  .account-plan svg { width: 11px; height: 11px; }
+
+  /* Select / Buttons */
+  .btn {
+    padding: 7px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-size: 13px; font-weight: 500;
+    border-radius: 8px;
+    transition: background 150ms ease, border-color 150ms ease;
+  }
+  .btn:hover { background: var(--surface); }
+  .btn-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--primary-2); }
+  .btn-danger {
+    color: var(--warn);
+    border-color: color-mix(in oklab, var(--warn), transparent 70%);
+  }
+  .btn-danger:hover { background: color-mix(in oklab, var(--warn), transparent 92%); }
+
+  .select {
+    padding: 7px 32px 7px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-size: 13px;
+    border-radius: 8px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2' stroke-linecap='round'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
+  }
+  .select:focus { outline: 2px solid var(--primary); outline-offset: 2px; border-color: var(--primary); }
+
+  /* Toggle */
+  .toggle {
+    position: relative;
+    width: 40px; height: 22px;
+    background: var(--border);
+    border-radius: 11px;
+    border: none;
+    cursor: pointer;
+    transition: background 200ms ease;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 200ms ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle.on { background: var(--success); }
+  .toggle.on::after { transform: translateX(18px); }
+  .toggle.on.danger { background: var(--warn); }
+
+  /* Theme picker */
+  .theme-picker {
+    display: flex; gap: 10px;
+  }
+  .theme-opt {
+    flex: 1; display: flex; flex-direction: column;
+    padding: 12px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 150ms ease;
+  }
+  .theme-opt:hover { border-color: var(--fg-3); }
+  .theme-opt.active { border-color: var(--primary); }
+  .theme-opt-preview {
+    height: 60px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .theme-opt-preview.light { background: linear-gradient(180deg, #FFFFFF 50%, #F5F5F7 50%); }
+  .theme-opt-preview.dark { background: linear-gradient(180deg, #1C1C1E 50%, #2C2C2E 50%); }
+  .theme-opt-preview.auto { background: linear-gradient(90deg, #FFFFFF 0%, #FFFFFF 50%, #1C1C1E 50%, #1C1C1E 100%); }
+  .theme-opt-name { font-size: 13px; font-weight: 500; text-align: center; }
+
+  .watermark {
+    text-align: center; font-size: 11px;
+    color: var(--fg-3);
+    padding: 12px 0 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">Z</div>
+        <span>OpenZ</span>
+      </div>
+      <button class="sidebar-toggle" aria-label="收起侧栏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      </button>
+    </div>
+
+    <button class="new-chat" onclick="window.location.href='web-home.html'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      新建会话
+    </button>
+
+    <div class="search">
+      <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+      <input type="text" placeholder="搜索会话…">
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-title"><span>项目 · 演示项目</span></div>
+        <a href="web-conversation.html" class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span class="text">AI Agent 产品分析报告</span>
+        </a>
+        <a href="web-conversation.html" class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span class="text">竞品功能矩阵整理</span>
+        </a>
+        <a href="web-conversation.html" class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span class="text">投资人路演稿改写</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title"><span>项目 · 内部工具</span></div>
+        <a href="web-conversation.html" class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span class="text">周报生成器</span>
+        </a>
+        <a href="web-conversation.html" class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span class="text">OKR 复盘助手</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-avatar">A</div>
+      <div class="user-info">
+        <div class="user-name">Alex</div>
+        <div class="user-plan">OpenZ Pro</div>
+      </div>
+      <button class="icon-btn" aria-label="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="settings-topbar">
+      <h1>设置</h1>
+    </div>
+
+    <div class="settings-body">
+      <nav class="settings-nav">
+        <div class="settings-nav-item active">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          账号
+        </div>
+        <div class="settings-nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          模型
+        </div>
+        <div class="settings-nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          外观
+        </div>
+        <div class="settings-nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          隐私
+        </div>
+        <div class="settings-nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          对话历史
+        </div>
+        <div class="settings-nav-divider"></div>
+        <div class="settings-nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          数据导出
+        </div>
+        <div class="settings-nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          关于 OpenZ
+        </div>
+      </nav>
+
+      <div class="settings-content">
+        <div class="settings-content-inner">
+
+          <div class="settings-section">
+            <h2>账号</h2>
+            <div class="account-card">
+              <div class="account-avatar">A</div>
+              <div class="account-info">
+                <div class="account-name">Alex Chen</div>
+                <div class="account-email">alex.chen@openz.ai</div>
+                <div class="account-plan">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15,8.5 22,9.5 17,14.5 18.5,22 12,18.5 5.5,22 7,14.5 2,9.5 9,8.5"/></svg>
+                  OpenZ Pro
+                </div>
+              </div>
+              <button class="btn">管理订阅</button>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">用户名</div>
+                  <div class="settings-row-desc">登录与显示名称</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="btn">编辑</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">邮箱</div>
+                  <div class="settings-row-desc">alex.chen@openz.ai</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="btn">更换</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">密码</div>
+                  <div class="settings-row-desc">上次修改：3 个月前</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="btn">修改</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">两步验证</div>
+                  <div class="settings-row-desc">使用身份验证器 App</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h2>模型</h2>
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">默认模型</div>
+                  <div class="settings-row-desc">新建对话时使用的模型</div>
+                </div>
+                <div class="settings-row-action">
+                  <select class="select">
+                    <option>OpenZ K2.6 思考</option>
+                    <option>OpenZ K2.6 快速</option>
+                    <option>OpenZ K2 联网</option>
+                    <option>OpenZ K1.5</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">Agent 人格</div>
+                  <div class="settings-row-desc">影响回复语气与风格</div>
+                </div>
+                <div class="settings-row-action">
+                  <select class="select">
+                    <option>默认助手</option>
+                    <option>编程专家</option>
+                    <option>学术研究</option>
+                    <option>创意写作</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">流式输出</div>
+                  <div class="settings-row-desc">逐字显示回复内容</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">思考过程</div>
+                  <div class="settings-row-desc">显示 AI 规划与推理步骤</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h2>外观</h2>
+            <div class="theme-picker">
+              <div class="theme-opt active">
+                <div class="theme-opt-preview light"></div>
+                <div class="theme-opt-name">浅色</div>
+              </div>
+              <div class="theme-opt">
+                <div class="theme-opt-preview dark"></div>
+                <div class="theme-opt-name">深色</div>
+              </div>
+              <div class="theme-opt">
+                <div class="theme-opt-preview auto"></div>
+                <div class="theme-opt-name">跟随系统</div>
+              </div>
+            </div>
+
+            <div class="settings-card" style="margin-top: 16px;">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">字号</div>
+                  <div class="settings-row-desc">影响所有文本显示大小</div>
+                </div>
+                <div class="settings-row-action">
+                  <select class="select">
+                    <option>小</option>
+                    <option>中（推荐）</option>
+                    <option>大</option>
+                    <option>特大</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">消息密度</div>
+                  <div class="settings-row-desc">对话流紧凑度</div>
+                </div>
+                <div class="settings-row-action">
+                  <select class="select">
+                    <option>紧凑</option>
+                    <option>适中（推荐）</option>
+                    <option>宽松</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">气泡样式</div>
+                  <div class="settings-row-desc">用户气泡对齐方式</div>
+                </div>
+                <div class="settings-row-action">
+                  <select class="select">
+                    <option>右对齐（推荐）</option>
+                    <option>居中</option>
+                    <option>全宽</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h2>对话历史</h2>
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">自动保存</div>
+                  <div class="settings-row-desc">所有对话自动保留 90 天</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">训练数据</div>
+                  <div class="settings-row-desc">允许使用对话改进模型</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="toggle" onclick="this.classList.toggle('on')"></button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-title">清除所有对话</div>
+                  <div class="settings-row-desc">不可恢复，请谨慎操作</div>
+                </div>
+                <div class="settings-row-action">
+                  <button class="btn btn-danger">清除</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="watermark">内容由 AI 生成，请核查重要信息</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

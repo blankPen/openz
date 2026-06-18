@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "web-conversation.html",
+  "entry": "web-conversation.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-06-18T03:23:28.659Z",
+  "updatedAt": "2026-06-18T03:23:28.659Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

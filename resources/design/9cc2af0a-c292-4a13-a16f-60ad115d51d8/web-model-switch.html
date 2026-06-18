@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZ · 模型切换（Web 桌面版）</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F5F5F7;
+    --surface-2: #EDEDF0;
+    --surface-3: #FAFAFA;
+    --border: #E5E5EA;
+    --border-soft: #F0F0F2;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-2: #1452CC;
+    --primary-soft: #EAF1FF;
+    --grad-blue: linear-gradient(135deg, #1A66FF 0%, #4A8BFF 100%);
+    --grad-purple: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
+    --grad-orange: linear-gradient(135deg, #FF7A45 0%, #FF9966 100%);
+    --grad-green: linear-gradient(135deg, #34A853 0%, #5BC880 100%);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --radius-pill: 9999px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+    --shadow-modal: 0 24px 64px rgba(0,0,0,0.24);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: #ECECF1;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+    overflow: hidden;
+  }
+  button { font-family: var(--font); cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+
+  /* === Background (dimmed main view) === */
+  .app {
+    position: relative;
+    height: 100vh;
+    max-width: 1440px; margin: 0 auto;
+    background: var(--bg);
+    box-shadow: 0 0 60px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+
+  .backdrop-layer {
+    height: 100%;
+    display: flex;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+  .sidebar {
+    width: 240px; flex-shrink: 0;
+    background: var(--surface-3);
+    border-right: 1px solid var(--border-soft);
+    padding: 14px 10px 10px;
+  }
+  .sidebar-fake {
+    height: 32px;
+    background: var(--primary);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+  .sidebar-fake-search {
+    height: 30px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+  }
+  .sidebar-fake-items {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .sidebar-fake-item {
+    height: 28px;
+    background: var(--surface);
+    border-radius: 7px;
+  }
+  .main-blurred {
+    flex: 1;
+    background: var(--bg);
+    padding: 24px 32px;
+  }
+  .main-blurred h1 {
+    font-size: 28px; font-weight: 600; color: var(--fg); margin-bottom: 24px;
+  }
+  .main-blurred-blocks {
+    display: flex; flex-direction: column; gap: 12px;
+    max-width: 700px;
+  }
+  .main-blurred-block {
+    height: 64px;
+    background: var(--surface-3);
+    border-radius: var(--radius);
+  }
+
+  /* === Backdrop + Modal === */
+  .backdrop {
+    position: fixed; inset: 0;
+    background: rgba(28, 28, 30, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal {
+    width: 100%;
+    max-width: 600px;
+    max-height: 80vh;
+    background: var(--bg);
+    border-radius: 20px;
+    box-shadow: var(--shadow-modal);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    animation: pop 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes pop {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px 16px;
+    flex-shrink: 0;
+  }
+  .modal-title {
+    font-size: 18px; font-weight: 600;
+  }
+  .modal-close {
+    width: 32px; height: 32px;
+    background: transparent; border: none;
+    border-radius: 8px;
+    color: var(--fg-3);
+    display: flex; align-items: center; justify-content: center;
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .modal-close:hover { background: var(--surface); color: var(--fg); }
+  .modal-close svg { width: 18px; height: 18px; }
+  .modal-body {
+    flex: 1; overflow-y: auto;
+    padding: 0 16px 16px;
+  }
+  .modal-body::-webkit-scrollbar { width: 6px; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .section {
+    margin-bottom: 8px;
+  }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px;
+  }
+  .section-label {
+    font-size: 11px; font-weight: 600;
+    color: var(--fg-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .section-meta {
+    font-size: 11px; color: var(--fg-3);
+  }
+  .section-list {
+    display: flex; flex-direction: column;
+    gap: 4px;
+  }
+  .option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 150ms ease;
+  }
+  .option:hover { background: var(--surface-3); }
+  .option.selected {
+    background: var(--primary-soft);
+  }
+  .option-icon {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: white;
+  }
+  .option-icon svg { width: 18px; height: 18px; }
+  .option-body { flex: 1; min-width: 0; }
+  .option-name {
+    font-size: 14px; font-weight: 500; color: var(--fg);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .option-name .badge {
+    font-size: 10px; font-weight: 600;
+    background: var(--primary);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .option-name .badge.pro {
+    background: linear-gradient(135deg, #FF7A45 0%, #FF9966 100%);
+  }
+  .option-desc {
+    font-size: 12.5px; color: var(--fg-3);
+    margin-top: 2px; line-height: 1.4;
+  }
+  .option-check {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .option-check svg { width: 12px; height: 12px; }
+  .option-check.empty {
+    background: transparent;
+    border: 1.5px solid var(--border);
+  }
+  .option.selected .option-check { display: flex; }
+  .option:not(.selected) .option-check:not(.empty) { display: none; }
+
+  .section-divider {
+    height: 1px;
+    background: var(--border-soft);
+    margin: 8px 12px;
+  }
+
+  .footer-hint {
+    padding: 8px 12px 0;
+    font-size: 11.5px; color: var(--fg-3);
+    text-align: center;
+  }
+  .watermark {
+    text-align: center; font-size: 11px;
+    color: var(--fg-3);
+    padding: 8px 0 4px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Dimmed background (suggests live page) -->
+  <div class="backdrop-layer">
+    <aside class="sidebar">
+      <div class="sidebar-fake"></div>
+      <div class="sidebar-fake-search"></div>
+      <div class="sidebar-fake-items">
+        <div class="sidebar-fake-item" style="width: 80%;"></div>
+        <div class="sidebar-fake-item" style="width: 65%;"></div>
+        <div class="sidebar-fake-item" style="width: 90%;"></div>
+        <div class="sidebar-fake-item" style="width: 70%;"></div>
+        <div class="sidebar-fake-item" style="width: 85%;"></div>
+      </div>
+    </aside>
+    <div class="main-blurred">
+      <h1>嗨 Alex，今天要和 OpenZ 一起做点什么？</h1>
+      <div class="main-blurred-blocks">
+        <div class="main-blurred-block"></div>
+        <div class="main-blurred-block"></div>
+        <div class="main-blurred-block"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="backdrop" onclick="if(event.target===this)window.location.href='web-home.html'">
+    <div class="modal" role="dialog" aria-label="选择模型">
+      <div class="modal-head">
+        <div class="modal-title">选择模型</div>
+        <button class="modal-close" aria-label="关闭" onclick="window.location.href='web-home.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="section">
+          <div class="section-head">
+            <span class="section-label">基础模型</span>
+            <span class="section-meta">3 个可选</span>
+          </div>
+          <div class="section-list">
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-blue);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">OpenZ K1.5</div>
+                <div class="option-desc">上一代旗舰模型，128K 上下文，免费</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-purple);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">OpenZ K2</div>
+                <div class="option-desc">多模态增强版，支持图像理解，256K 上下文</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+            <div class="option selected">
+              <div class="option-icon" style="background: var(--grad-blue);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">OpenZ K2.6 <span class="badge">推荐</span></div>
+                <div class="option-desc">最新旗舰模型，深度思考 + 多模态 + 工具调用</div>
+              </div>
+              <div class="option-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-label">推理模式</span>
+            <span class="section-meta">影响响应速度与深度</span>
+          </div>
+          <div class="section-list">
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-blue);">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">思考模式</div>
+                <div class="option-desc">深度推理 · 规划步骤 · 适合复杂任务</div>
+              </div>
+              <div class="option-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
+              </div>
+            </div>
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-orange);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">快速模式</div>
+                <div class="option-desc">秒级响应 · 简洁直接 · 适合日常对话</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-green);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">联网模式</div>
+                <div class="option-desc">实时搜索 · 引用来源 · 信息有时效保证</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-purple);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">专业模式 <span class="badge pro">PRO</span></div>
+                <div class="option-desc">更长推理 · 多步工具链 · 适合研究与编程</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-label">Agent 人格</span>
+            <span class="section-meta">影响回复语气与风格</span>
+          </div>
+          <div class="section-list">
+            <div class="option selected">
+              <div class="option-icon" style="background: var(--grad-blue);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">默认助手</div>
+                <div class="option-desc">平衡专业与亲切 · 通用场景</div>
+              </div>
+              <div class="option-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
+              </div>
+            </div>
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-purple);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">编程专家</div>
+                <div class="option-desc">代码优先 · 技术精确 · 多语言支持</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-orange);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">学术研究</div>
+                <div class="option-desc">严谨求证 · 引用规范 · 适合论文写作</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+            <div class="option">
+              <div class="option-icon" style="background: var(--grad-green);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+              </div>
+              <div class="option-body">
+                <div class="option-name">创意写作</div>
+                <div class="option-desc">想象力优先 · 文字优美 · 适合内容创作</div>
+              </div>
+              <div class="option-check empty"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-hint">选择后立即生效，<kbd>ESC</kbd> 关闭</div>
+      <div class="watermark">内容由 AI 生成，请核查重要信息</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') window.location.href = 'web-home.html';
+  });
+</script>
+</body>
+</html>

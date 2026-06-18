@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenZ · 附件（Web 桌面版）</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F5F5F7;
+    --surface-2: #EDEDF0;
+    --surface-3: #FAFAFA;
+    --border: #E5E5EA;
+    --border-soft: #F0F0F2;
+    --fg: #1C1C1E;
+    --fg-2: #3C3C43;
+    --fg-3: #8E8E93;
+    --primary: #1A66FF;
+    --primary-2: #1452CC;
+    --primary-soft: #EAF1FF;
+    --grad-blue: linear-gradient(135deg, #1A66FF 0%, #4A8BFF 100%);
+    --grad-orange: linear-gradient(135deg, #FF7A45 0%, #FF9966 100%);
+    --grad-purple: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
+    --grad-green: linear-gradient(135deg, #34A853 0%, #5BC880 100%);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+    --shadow-modal: 0 24px 64px rgba(0,0,0,0.24);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: #ECECF1;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+    overflow: hidden;
+  }
+  button { font-family: var(--font); cursor: pointer; }
+
+  .app {
+    position: relative; height: 100vh;
+    max-width: 1440px; margin: 0 auto;
+    background: var(--bg);
+    box-shadow: 0 0 60px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+  .backdrop-layer {
+    height: 100%;
+    display: flex;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+  .sidebar {
+    width: 240px; flex-shrink: 0;
+    background: var(--surface-3);
+    border-right: 1px solid var(--border-soft);
+    padding: 14px 10px 10px;
+  }
+  .sidebar-fake {
+    height: 32px;
+    background: var(--primary);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+  .sidebar-fake-search {
+    height: 30px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+  }
+  .sidebar-fake-items { display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-fake-item {
+    height: 28px;
+    background: var(--surface);
+    border-radius: 7px;
+  }
+  .main-blurred { flex: 1; background: var(--bg); padding: 24px 32px; }
+  .main-blurred h1 { font-size: 28px; font-weight: 600; color: var(--fg); margin-bottom: 24px; }
+  .main-blurred-blocks { display: flex; flex-direction: column; gap: 12px; max-width: 700px; }
+  .main-blurred-block {
+    height: 64px;
+    background: var(--surface-3);
+    border-radius: var(--radius);
+  }
+
+  /* Modal */
+  .backdrop {
+    position: fixed; inset: 0;
+    background: rgba(28, 28, 30, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal {
+    width: 100%;
+    max-width: 640px;
+    max-height: 84vh;
+    background: var(--bg);
+    border-radius: 20px;
+    box-shadow: var(--shadow-modal);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    animation: pop 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes pop {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px 16px;
+    flex-shrink: 0;
+  }
+  .modal-title { font-size: 18px; font-weight: 600; }
+  .modal-close {
+    width: 32px; height: 32px;
+    background: transparent; border: none;
+    border-radius: 8px; color: var(--fg-3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: var(--surface); color: var(--fg); }
+  .modal-close svg { width: 18px; height: 18px; }
+  .modal-body {
+    flex: 1; overflow-y: auto;
+    padding: 0 24px 16px;
+  }
+  .modal-body::-webkit-scrollbar { width: 6px; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Drop zone */
+  .dropzone {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 24px;
+    margin-bottom: 20px;
+    background: var(--surface-3);
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-lg);
+    text-align: center;
+    transition: background 150ms ease, border-color 150ms ease;
+  }
+  .dropzone:hover {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+  }
+  .dropzone-icon {
+    width: 44px; height: 44px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .dropzone-icon svg { width: 22px; height: 22px; }
+  .dropzone-title {
+    font-size: 14px; font-weight: 500;
+    color: var(--fg);
+    margin-bottom: 4px;
+  }
+  .dropzone-title .accent { color: var(--primary); }
+  .dropzone-hint {
+    font-size: 12.5px; color: var(--fg-3);
+  }
+
+  /* 4 entry grid */
+  .entries-label {
+    font-size: 11px; font-weight: 600;
+    color: var(--fg-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+    padding: 0 4px;
+  }
+  .entries-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .entry {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease, transform 100ms ease;
+  }
+  .entry:hover {
+    background: var(--surface-3);
+    border-color: var(--primary-soft);
+  }
+  .entry:active { transform: scale(0.98); }
+  .entry-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    flex-shrink: 0;
+  }
+  .entry-icon svg { width: 20px; height: 20px; }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-name {
+    font-size: 14px; font-weight: 500; color: var(--fg);
+    margin-bottom: 2px;
+  }
+  .entry-desc {
+    font-size: 12px; color: var(--fg-3);
+    line-height: 1.3;
+  }
+  .entry-badge {
+    font-size: 10px; font-weight: 600;
+    background: var(--primary-soft);
+    color: var(--primary);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+
+  /* Recent files */
+  .recent-section {
+    margin-top: 8px;
+  }
+  .recent-list {
+    display: flex; flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .recent-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+  .recent-item:last-child { border-bottom: none; }
+  .recent-item:hover { background: var(--surface-3); }
+  .recent-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    flex-shrink: 0;
+  }
+  .recent-icon svg { width: 16px; height: 16px; }
+  .recent-info { flex: 1; min-width: 0; }
+  .recent-name {
+    font-size: 13px; font-weight: 500; color: var(--fg);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .recent-meta {
+    font-size: 11.5px; color: var(--fg-3); margin-top: 1px;
+  }
+  .recent-remove {
+    width: 24px; height: 24px;
+    background: transparent; border: none;
+    border-radius: 5px;
+    color: var(--fg-3);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity 150ms ease, background 150ms ease;
+  }
+  .recent-item:hover .recent-remove { opacity: 1; }
+  .recent-remove:hover { background: var(--surface-2); color: var(--fg); }
+  .recent-remove svg { width: 14px; height: 14px; }
+
+  .footer-hint {
+    padding: 8px 24px 0;
+    font-size: 11.5px; color: var(--fg-3);
+    text-align: center;
+  }
+  .watermark {
+    text-align: center; font-size: 11px;
+    color: var(--fg-3);
+    padding: 6px 0 8px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="backdrop-layer">
+    <aside class="sidebar">
+      <div class="sidebar-fake"></div>
+      <div class="sidebar-fake-search"></div>
+      <div class="sidebar-fake-items">
+        <div class="sidebar-fake-item" style="width: 80%;"></div>
+        <div class="sidebar-fake-item" style="width: 65%;"></div>
+        <div class="sidebar-fake-item" style="width: 90%;"></div>
+        <div class="sidebar-fake-item" style="width: 70%;"></div>
+        <div class="sidebar-fake-item" style="width: 85%;"></div>
+      </div>
+    </aside>
+    <div class="main-blurred">
+      <h1>嗨 Alex，今天要和 OpenZ 一起做点什么？</h1>
+      <div class="main-blurred-blocks">
+        <div class="main-blurred-block"></div>
+        <div class="main-blurred-block"></div>
+        <div class="main-blurred-block"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="backdrop" onclick="if(event.target===this)window.location.href='web-conversation.html'">
+    <div class="modal" role="dialog" aria-label="附件">
+      <div class="modal-head">
+        <div class="modal-title">添加附件</div>
+        <button class="modal-close" aria-label="关闭" onclick="window.location.href='web-conversation.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="dropzone">
+          <div class="dropzone-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="dropzone-title">拖拽文件到此处，或<span class="accent">点击选择</span></div>
+          <div class="dropzone-hint">支持图片、PDF、Word、Excel、PPT，单个文件 ≤ 50MB</div>
+        </div>
+
+        <div class="entries-label">添加方式</div>
+        <div class="entries-grid">
+          <div class="entry">
+            <div class="entry-icon" style="background: var(--grad-blue);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+            </div>
+            <div class="entry-body">
+              <div class="entry-name">本地图片</div>
+              <div class="entry-desc">JPG / PNG / WebP / GIF</div>
+            </div>
+          </div>
+
+          <div class="entry">
+            <div class="entry-icon" style="background: var(--grad-orange);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+            </div>
+            <div class="entry-body">
+              <div class="entry-name">本地文件</div>
+              <div class="entry-desc">PDF / Word / Excel / PPT</div>
+            </div>
+          </div>
+
+          <div class="entry">
+            <div class="entry-icon" style="background: var(--grad-purple);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+            <div class="entry-body">
+              <div class="entry-name">拍照</div>
+              <div class="entry-desc">使用摄像头拍摄</div>
+            </div>
+          </div>
+
+          <div class="entry">
+            <div class="entry-icon" style="background: var(--grad-green);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,17 4,12 9,7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
+            </div>
+            <div class="entry-body">
+              <div class="entry-name">卡片引用</div>
+              <div class="entry-desc">引用上一轮内容 <span class="entry-badge">@回复</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="recent-section">
+          <div class="entries-label">最近上传（3）</div>
+          <div class="recent-list">
+            <div class="recent-item">
+              <div class="recent-icon" style="background: var(--grad-blue);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+              </div>
+              <div class="recent-info">
+                <div class="recent-name">产品架构图-v2.png</div>
+                <div class="recent-meta">1.2 MB · 今天 14:22</div>
+              </div>
+              <button class="recent-remove" aria-label="移除">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="recent-item">
+              <div class="recent-icon" style="background: var(--grad-orange);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+              </div>
+              <div class="recent-info">
+                <div class="recent-name">竞品分析报告-Q3.pdf</div>
+                <div class="recent-meta">4.8 MB · 昨天 17:05</div>
+              </div>
+              <button class="recent-remove" aria-label="移除">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="recent-item">
+              <div class="recent-icon" style="background: var(--grad-green);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              </div>
+              <div class="recent-info">
+                <div class="recent-name">用户访谈记录.xlsx</div>
+                <div class="recent-meta">812 KB · 2 天前</div>
+              </div>
+              <button class="recent-remove" aria-label="移除">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-hint">选择文件后直接附加到下一条消息 · <kbd>ESC</kbd> 关闭</div>
+      <div class="watermark">内容由 AI 生成，请核查重要信息</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') window.location.href = 'web-conversation.html';
+  });
+</script>
+</body>
+</html>
