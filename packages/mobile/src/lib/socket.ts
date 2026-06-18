@@ -3,11 +3,16 @@
 // 职责：
 //   - 按 serverUrl 缓存 Socket 实例，相同地址复用
 //   - 默认配置：自动重连 + WebSocket 单传输
-//   - 未传 serverUrl 时自动从 settingsStore.serverUrl 读取
+//   - 未传 serverUrl 时自动从 settingsStore 读取
 //   - 暴露 disconnectAll() 用于 AppState 后台时清理
+//
+// 备注：连接状态/错误日志在 useSessions / useSessionStream / useTtsClient 中记录，
+// 这里只打一行 connection 创建日志，避免与 _setupSocketConnection 的 connect handler 冲突。
 
 import { io, Socket, ManagerOptions, SocketOptions } from 'socket.io-client';
 import { useSettingsStore } from '../stores/settingsStore';
+
+const log = (...args: unknown[]) => console.log('[mobile/socket]', ...args);
 
 /** Socket.IO 默认配置（移动端推荐 WebSocket 单传输） */
 export const DEFAULT_SOCKET_OPTIONS: Partial<ManagerOptions & SocketOptions> = {
@@ -34,6 +39,7 @@ export function getSocket(serverUrl?: string, options?: Partial<SocketOptions>):
     ...DEFAULT_SOCKET_OPTIONS,
     ...(options ?? {}),
   };
+  log('creating socket to', url, 'with options', merged);
   const socket = io(url, merged);
   socketCache.set(url, socket);
   return socket;
@@ -41,6 +47,7 @@ export function getSocket(serverUrl?: string, options?: Partial<SocketOptions>):
 
 /** 断开并清空所有缓存的 Socket 实例。常用于 AppState 后台切换。 */
 export function disconnectAll(): void {
+  log('disconnectAll, count=', socketCache.size);
   for (const socket of socketCache.values()) {
     try {
       socket.removeAllListeners();

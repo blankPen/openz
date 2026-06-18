@@ -13,6 +13,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettingsStore } from '../stores/settingsStore';
 import type { CreateSessionRequest, Session } from '@openz/shared';
 
+/** 日志开关（生产环境可设为 false 关闭） */
+const LOG_ENABLED = true;
+const log = (...args: unknown[]) => {
+  if (LOG_ENABLED) console.log('[mobile/http]', ...args);
+};
+
 const STALE_TIME = 30 * 1000;
 
 /** 解析当前 serverUrl（保证 queryKey 一致；订阅 store 变化以触发重新渲染） */
@@ -27,9 +33,13 @@ function useServerUrl(): string {
 
 /** GET /sessions */
 async function fetchSessions(serverUrl: string): Promise<Session[]> {
+  log('→ GET', `${serverUrl}/sessions`);
+  const t0 = Date.now();
   const resp = await fetch(`${serverUrl}/sessions`);
+  log('← GET /sessions', resp.status, 'in', Date.now() - t0, 'ms');
   if (!resp.ok) throw new Error(`fetchSessions: ${resp.status}`);
   const data = await resp.json();
+  log('  sessions count=', (data.sessions ?? []).length);
   return data.sessions ?? [];
 }
 
@@ -38,19 +48,26 @@ async function createSessionApi(
   serverUrl: string,
   req: CreateSessionRequest,
 ): Promise<Session> {
+  log('→ POST', `${serverUrl}/sessions`, 'body=', JSON.stringify(req));
+  const t0 = Date.now();
   const resp = await fetch(`${serverUrl}/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
   });
+  log('← POST /sessions', resp.status, 'in', Date.now() - t0, 'ms');
   if (!resp.ok) throw new Error(`createSession: ${resp.status}`);
   const data = await resp.json();
+  log('  created session id=', data.session?.id);
   return data.session;
 }
 
 /** DELETE /sessions/:id */
 async function deleteSessionApi(serverUrl: string, sessionId: string): Promise<void> {
+  log('→ DELETE', `${serverUrl}/sessions/${sessionId}`);
+  const t0 = Date.now();
   const resp = await fetch(`${serverUrl}/sessions/${sessionId}`, { method: 'DELETE' });
+  log('← DELETE /sessions/:id', resp.status, 'in', Date.now() - t0, 'ms');
   if (!resp.ok) throw new Error(`deleteSession: ${resp.status}`);
 }
 
@@ -61,9 +78,13 @@ async function fetchSessionHistory(
   after?: number,
 ): Promise<unknown[]> {
   const url = `${serverUrl}/sessions/${sessionId}/events${after !== undefined ? `?after=${after}` : ''}`;
+  log('→ GET', url);
+  const t0 = Date.now();
   const resp = await fetch(url);
+  log('← GET events', resp.status, 'in', Date.now() - t0, 'ms');
   if (!resp.ok) throw new Error(`fetchSessionHistory: ${resp.status}`);
   const data = await resp.json();
+  log('  events count=', (data.events ?? []).length);
   return data.events ?? [];
 }
 
@@ -85,8 +106,10 @@ export function useCreateSession() {
   return useMutation({
     mutationFn: (req: CreateSessionRequest) => createSessionApi(serverUrl, req),
     onSuccess: () => {
+      log('createSession success, invalidating list');
       qc.invalidateQueries({ queryKey: ['sessions', serverUrl] });
     },
+    onError: (err: any) => log('✗ createSession error:', err?.message ?? err),
   });
 }
 
@@ -97,8 +120,10 @@ export function useDeleteSession() {
   return useMutation({
     mutationFn: (sessionId: string) => deleteSessionApi(serverUrl, sessionId),
     onSuccess: () => {
+      log('deleteSession success, invalidating list');
       qc.invalidateQueries({ queryKey: ['sessions', serverUrl] });
     },
+    onError: (err: any) => log('✗ deleteSession error:', err?.message ?? err),
   });
 }
 

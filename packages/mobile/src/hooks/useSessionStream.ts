@@ -8,11 +8,17 @@
 // 暴露 abort() 主动取消（AbortController）
 //
 // 注：本 hook 不直接渲染 React 状态机的事件——事件消费由调用方注入 reducer
-// （参见 lib/eventReducer.ts，由 Agent A 维护）。
+// （参见 lib/eventReducer.ts）。
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import type { AgentEvent } from '@openz/shared';
+
+/** 日志开关（生产环境可设为 false 关闭） */
+const LOG_ENABLED = true;
+const log = (...args: unknown[]) => {
+  if (LOG_ENABLED) console.log('[mobile/sse]', ...args);
+};
 
 export interface UseSessionStreamOptions {
   /** 每解析到一个事件触发 */
@@ -42,6 +48,7 @@ export function useSessionStream(
   onCloseRef.current = onClose;
 
   const abort = useCallback(() => {
+    log('abort() called');
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
@@ -59,9 +66,16 @@ export function useSessionStream(
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!sessionId) return;
+      if (!sessionId) {
+        log('sendMessage: no sessionId, skip');
+        return;
+      }
       const serverUrl = useSettingsStore.getState().serverUrl;
-      if (!serverUrl) throw new Error('serverUrl 未配置');
+      if (!serverUrl) {
+        log('✗ sendMessage: serverUrl 未配置');
+        throw new Error('serverUrl 未配置');
+      }
+      log('→ POST', `${serverUrl}/sessions/${sessionId}/send`, 'message=', JSON.stringify(text).slice(0, 60));
 
       // 取消上一次未完成请求
       if (abortRef.current) abortRef.current.abort();
@@ -79,32 +93,43 @@ export function useSessionStream(
           body: JSON.stringify({ message: text }),
           signal: ac.signal,
         });
+        log('← response', resp.status, resp.statusText, 'content-type=', (resp.headers as any)?.get?.('content-type') ?? '(none)');
         if (!resp.ok) {
           throw new Error(`SSE 请求失败: ${resp.status}`);
         }
         if (!resp.body) {
           throw new Error('SSE 响应无 body');
         }
+        let eventCount = 0;
         await readSseStream(resp.body, {
           onEvent: (e) => {
+            eventCount++;
+            if (eventCount === 1 || eventCount % 10 === 0 || e.type === 'turn_done' || e.type === 'error') {
+              log('  event #' + eventCount, e.type, e.seq !== undefined ? 'seq=' + e.seq : '');
+            }
             onEventRef.current?.(e);
             if (e.type === 'turn_done') {
+              log('✓ turn_done, closing stream');
               ac.abort();
               setIsStreaming(false);
               onCloseRef.current?.('turn_done');
             } else if (e.type === 'error') {
+              log('✗ error event, closing stream');
               ac.abort();
               setIsStreaming(false);
               onCloseRef.current?.('error');
             }
           },
         });
+        log('✓ stream closed, total events=', eventCount);
         // 正常结束
         setIsStreaming(false);
       } catch (err: any) {
         if (err?.name === 'AbortError') {
+          log('aborted');
           onCloseRef.current?.('aborted');
         } else {
+          log('✗ network error:', err?.message ?? err);
           onCloseRef.current?.('network');
         }
         setIsStreaming(false);
@@ -144,8 +169,8 @@ async function readSseStream(
         data: json.data ?? json,
       } as AgentEvent;
       handlers.onEvent(evt);
-    } catch {
-      /* 忽略解析错误 */
+    } catch (e) {
+      log('✗ failed to parse SSE frame:', currentData, e);
     }
     currentEvent = 'message';
     currentData = '';
