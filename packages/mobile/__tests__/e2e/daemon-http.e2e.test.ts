@@ -2,8 +2,10 @@
 //
 // 假设 daemon 已在 localhost:19999 direct 模式运行（无 TTS）。
 // 测试覆盖 mobile useSessions / useSessionStream / settingsStore 实际会调用的端点。
+//
+// 使用 jest 全局变量（不引 @jest/globals 避免额外的类型依赖）。
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+
 
 const BASE = 'http://localhost:19999';
 
