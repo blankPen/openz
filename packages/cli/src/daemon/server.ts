@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
-import { createServer } from 'http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import { io, type Socket as ClientSocket } from 'socket.io-client';
 import { SessionManager } from './session.js';
 import { ClaudeAgent } from '../agents/claude.js';
@@ -11,13 +11,13 @@ import type {
   SessionRequest,
   SessionCreatedResponse,
   SessionListResponse,
-  SessionErrorResponse,
   SessionEventResponse,
+  SessionHistoryResponse,
   AgentEvent,
 } from '@openz/shared';
 import { DEFAULT_PORT, getDaemonStatePath, type DaemonState } from './types.js';
 import { loadConfig } from './config.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 
 const LOG_FILE = `${process.env.HOME}/.openz/daemon.log`;
@@ -39,41 +39,94 @@ function saveDaemonState(state: DaemonState) {
   writeFileSync(getDaemonStatePath(), JSON.stringify(state, null, 2));
 }
 
-/**
- * TTS 输出 sink 抽象。
- * 不同模式下把 PCM 帧和控制事件写到不同的下游。
- */
+// ============================================================
+// HTTP 工具
+// ============================================================
+
+/** 从 IncomingMessage 读取 body */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+}
+
+function jsonResponse(res: ServerResponse, status: number, data: unknown) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+function sendError(res: ServerResponse, status: number, error: string) {
+  jsonResponse(res, status, { error });
+}
+
+/** 路由匹配：返回 { route, sessionId? } 或 null */
+function matchHttpRoute(method: string, path: string): { route: string; sessionId?: string } | null {
+  // GET  /sessions
+  if (method === 'GET' && path === '/sessions') return { route: 'list' };
+  // POST /sessions
+  if (method === 'POST' && path === '/sessions') return { route: 'create' };
+
+  // DELETE /sessions/:id
+  const deleteMatch = method === 'DELETE' && path.match(/^\/sessions\/([^/]+)$/);
+  if (deleteMatch) return { route: 'delete', sessionId: deleteMatch[1] };
+
+  // GET /sessions/:id/events?after=<seq>
+  const eventsMatch = method === 'GET' && path.match(/^\/sessions\/([^/]+)\/events$/);
+  if (eventsMatch) return { route: 'events', sessionId: eventsMatch[1] };
+
+  // POST /sessions/:id/send → SSE
+  const sendMatch = method === 'POST' && path.match(/^\/sessions\/([^/]+)\/send$/);
+  if (sendMatch) return { route: 'send', sessionId: sendMatch[1] };
+
+  // POST /sessions/:id/interrupt
+  const interruptMatch = method === 'POST' && path.match(/^\/sessions\/([^/]+)\/interrupt$/);
+  if (interruptMatch) return { route: 'interrupt', sessionId: interruptMatch[1] };
+
+  // POST /sessions/:id/stop
+  const stopMatch = method === 'POST' && path.match(/^\/sessions\/([^/]+)\/stop$/);
+  if (stopMatch) return { route: 'stop', sessionId: stopMatch[1] };
+
+  return null;
+}
+
+// ============================================================
+// TTS sink 抽象
+// ============================================================
+
 export interface TtsSink {
-  /** 发送一帧 PCM 字节；返回 false 表示下游已关闭 */
   sendAudio(frame: Buffer | Uint8Array): boolean;
-  /** 发送一条控制事件（first_frame / chunk / end / error） */
   sendEvent(event: Record<string, any>): boolean;
-  /** 下游是否仍可写 */
   isOpen(): boolean;
 }
+
+// ============================================================
+// Daemon 启动
+// ============================================================
 
 export async function startDaemon(port = DEFAULT_PORT, serverUrl?: string) {
   const daemonId = `daemon-${randomUUID().slice(0, 8)}`;
 
-  // If serverUrl is provided, run in relay mode (connect to remote server)
   if (serverUrl) {
     return startDaemonRelayMode(daemonId, serverUrl);
   }
 
-  // Otherwise, run in direct mode (listen for connections)
   return startDaemonDirectMode(port, daemonId);
 }
 
-async function startDaemonDirectMode(port: number, daemonId: string) {
+// ============================================================
+// Direct 模式 —— daemon 同时提供 HTTP REST + SSE + Socket.IO
+// ============================================================
+
+async function startDaemonDirectMode(port: number, _daemonId: string) {
   const httpServer = createServer();
-  const io = new SocketIOServer(httpServer, {
-    cors: { origin: '*' },
-  });
+  const io = new SocketIOServer(httpServer, { cors: { origin: '*' } });
 
   const agent = new ClaudeAgent();
   const sessionManager = new SessionManager(agent);
 
-  // 保存 daemon 状态
   const state: DaemonState = {
     pid: process.pid,
     port,
@@ -82,9 +135,43 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
   };
   saveDaemonState(state);
 
-  // Socket.IO 事件处理
+  // -------- HTTP REST + SSE 路由 --------
+  httpServer.on('request', async (req, res) => {
+    // 不拦截 socket.io 的内部请求
+    if (req.url?.startsWith('/socket.io')) return;
+
+    // CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url || '/', `http://localhost:${port}`);
+    const route = matchHttpRoute(req.method || 'GET', url.pathname);
+
+    if (!route) {
+      sendError(res, 404, 'Not found');
+      return;
+    }
+
+    try {
+      await handleHttpRoute(route, url, req, res, sessionManager);
+    } catch (err: any) {
+      log('[HTTP] error:', err.message);
+      sendError(res, 500, err.message || 'Internal error');
+    }
+  });
+
+  // -------- Socket.IO 事件（向后兼容 + TTS）--------
   io.on('connection', (socket: Socket) => {
     console.log(`Client connected: ${socket.id}`);
+
+    // -- 会话管理 (保持与 web 端兼容) --
 
     socket.on('session:create', async (req: CreateSessionRequest, ack) => {
       log('session:create', req);
@@ -95,21 +182,17 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
           cwd: req.cwd,
           model: req.model,
           onEvent: (event: AgentEvent) => {
-            const response: SessionEventResponse = { sessionId: session.id, event };
-            socket.emit('session:event', response);
+            socket.emit('session:event', { sessionId: session.id, event } satisfies SessionEventResponse);
           },
         });
 
         sessionManager.setOnEvent(session.id, (event: AgentEvent) => {
-          const response: SessionEventResponse = { sessionId: session.id, event };
-          socket.emit('session:event', response);
+          socket.emit('session:event', { sessionId: session.id, event } satisfies SessionEventResponse);
         });
 
-        const response: SessionCreatedResponse = { session };
-        ack?.(response);
-        socket.emit('session:created', response);
+        ack?.({ session } satisfies SessionCreatedResponse);
+        socket.emit('session:created', { session } satisfies SessionCreatedResponse);
       } catch (err: any) {
-        const response: SessionErrorResponse = { sessionId: req.id || '', error: err.message };
         ack?.({ error: err.message });
       }
     });
@@ -117,8 +200,7 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
     socket.on('session:send', async (req: SendMessageRequest, ack) => {
       log('session:send', req);
       try {
-        const entry = sessionManager.getSession(req.sessionId);
-        if (!entry) {
+        if (!sessionManager.getSession(req.sessionId)) {
           ack?.({ error: `Session ${req.sessionId} not found` });
           return;
         }
@@ -131,8 +213,7 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
           } else {
             log('event emitted:', event.type);
           }
-          const response: SessionEventResponse = { sessionId: req.sessionId, event };
-          socket.emit('session:event', response);
+          socket.emit('session:event', { sessionId: req.sessionId, event } satisfies SessionEventResponse);
         });
 
         await sessionManager.sendMessage(req.sessionId, req.message);
@@ -155,14 +236,43 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
     });
 
     socket.on('session:list', (_, ack) => {
-      const sessions = sessionManager.getAllSessions();
-      const response: SessionListResponse = { sessions };
-      ack?.(response);
+      ack?.({ sessions: sessionManager.getAllSessions() } satisfies SessionListResponse);
     });
 
     socket.on('session:delete', (req: SessionRequest, ack) => {
       sessionManager.deleteSession(req.sessionId);
       ack?.({ ok: true });
+    });
+
+    // -- TTS 语音合成 --
+    socket.on('tts:start', (req: { sessionId: string; message: string }, ack?: (r: any) => void) => {
+      log('tts:start', req);
+      try {
+        if (!sessionManager.getSession(req.sessionId)) {
+          ack?.({ error: `Session ${req.sessionId} not found` });
+          return;
+        }
+
+        const sessionId = req.sessionId;
+        const sink: TtsSink = {
+          isOpen: () => socket.connected,
+          sendAudio: (frame) => {
+            if (!socket.connected) return false;
+            socket.emit('tts:audio', { sessionId }, frame as Buffer);
+            return true;
+          },
+          sendEvent: (event) => {
+            if (!socket.connected) return false;
+            socket.emit('tts:event', { sessionId, ...event });
+            return true;
+          },
+        };
+
+        runTtsStream(sessionId, req.message, sessionManager, sink);
+        ack?.({ ok: true });
+      } catch (err: any) {
+        ack?.({ error: err.message });
+      }
     });
 
     socket.on('disconnect', () => {
@@ -183,14 +293,141 @@ async function startDaemonDirectMode(port: number, daemonId: string) {
   });
 }
 
-/**
- * 启动一次 TTS 流：把 agent 文本增量喂给 volcengine bidirectionTtsStream，
- * 把返回的 PCM 帧和控制事件写到 sink。文本端通过 generator 推送给 volcengine。
- *
- * @param onEvent - 可选的事件转发钩子。TTS 流程只把 onEvent 用来喂文本给 volcengine，
- *                  但 web 端还需要看到完整事件流渲染 UI；调用方传一个把事件 emit 到
- *                  server（→ web）的回调进来，否则页面会"听得到声音但看不到文字"。
- */
+// ============================================================
+// HTTP 路由处理（direct 模式）
+// ============================================================
+
+async function handleHttpRoute(
+  route: { route: string; sessionId?: string },
+  url: URL,
+  req: IncomingMessage,
+  res: ServerResponse,
+  sessionManager: SessionManager,
+) {
+  const { route: routeName, sessionId } = route;
+
+  switch (routeName) {
+    // GET /sessions
+    case 'list': {
+      const sessions = sessionManager.getAllSessions();
+      jsonResponse(res, 200, { sessions } satisfies SessionListResponse);
+      return;
+    }
+
+    // POST /sessions
+    case 'create': {
+      const body = JSON.parse(await readBody(req));
+      const session = await sessionManager.createSession({
+        id: body.id,
+        engine: body.engine,
+        cwd: body.cwd,
+        model: body.model,
+      });
+      jsonResponse(res, 201, session);
+      return;
+    }
+
+    // DELETE /sessions/:id
+    case 'delete': {
+      sessionManager.deleteSession(sessionId!);
+      jsonResponse(res, 200, { ok: true });
+      return;
+    }
+
+    // GET /sessions/:id/events?after=<seq>
+    case 'events': {
+      const after = url.searchParams.get('after');
+      const events = sessionManager.getEvents(sessionId!, after ? Number(after) : undefined);
+      jsonResponse(res, 200, { sessionId: sessionId!, events } satisfies SessionHistoryResponse);
+      return;
+    }
+
+    // POST /sessions/:id/send → SSE 流
+    case 'send': {
+      const body = JSON.parse(await readBody(req));
+      const message: string = body.message;
+      if (!message || !message.trim()) {
+        sendError(res, 400, 'message is required');
+        return;
+      }
+
+      if (!sessionManager.getSession(sessionId!)) {
+        sendError(res, 404, `Session ${sessionId} not found`);
+        return;
+      }
+
+      // SSE 响应头
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
+
+      let ended = false;
+      const end = () => {
+        if (!ended) { ended = true; res.end(); }
+      };
+
+      // 监听断开
+      req.on('close', () => { end(); });
+
+      // 设置事件回调：事件 → SSE
+      sessionManager.setOnEvent(sessionId!, (event: AgentEvent) => {
+        if (ended) return;
+        res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+        if (event.type === 'turn_done' || event.type === 'error') {
+          end();
+        }
+      });
+
+      sessionManager.updateSessionStatus(sessionId!, 'running');
+
+      try {
+        await sessionManager.sendMessage(sessionId!, message.trim());
+        // 兜底：sendMessage 已返回但 turn_done 可能未 emit（边界情况）
+        end();
+      } catch (err: any) {
+        if (!ended) {
+          res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+        }
+        end();
+      }
+      return;
+    }
+
+    // POST /sessions/:id/interrupt
+    case 'interrupt': {
+      if (!sessionManager.getSession(sessionId!)) {
+        sendError(res, 404, `Session ${sessionId} not found`);
+        return;
+      }
+      sessionManager.interruptSession(sessionId!);
+      sessionManager.updateSessionStatus(sessionId!, 'interrupted');
+      jsonResponse(res, 200, { ok: true });
+      return;
+    }
+
+    // POST /sessions/:id/stop
+    case 'stop': {
+      if (!sessionManager.getSession(sessionId!)) {
+        sendError(res, 404, `Session ${sessionId} not found`);
+        return;
+      }
+      sessionManager.stopSession(sessionId!);
+      sessionManager.updateSessionStatus(sessionId!, 'done');
+      jsonResponse(res, 200, { ok: true });
+      return;
+    }
+
+    default:
+      sendError(res, 404, 'Not found');
+  }
+}
+
+// ============================================================
+// TTS 流（与 relay 模式共用）
+// ============================================================
+
 function runTtsStream(
   sessionId: string,
   message: string,
@@ -208,11 +445,6 @@ function runTtsStream(
         yield textQueue.shift()!;
         continue;
       }
-      // queue 空：挂起等待下一个 text_delta 或 turn_done 唤醒。
-      // 这里把 Promise resolve 传回来的值（resolveNextChunk 接收的 chunk）
-      // 存进 resolved 并 yield 出去——之前的实现里这个值被 await 默默
-      // 丢弃，导致每个 text_delta 的首段永远到不了火山，火山收到残缺
-      // 文本返回 0 帧。
       const resolved = await new Promise<string>((resolve) => {
         resolveNextChunk = resolve;
       });
@@ -223,10 +455,8 @@ function runTtsStream(
   }
 
   const handleEvent = (event: AgentEvent) => {
-    // 先把事件转发给调用方（一般是 emit 给 server → web 显示 UI）
     onEvent?.(event);
 
-    // 再做 TTS 特有的处理：text_delta 喂 volcengine，turn_done 收尾
     if (event.type === 'text_delta') {
       const text = event.data.text;
       const sentences = text.match(/[^.。!！?？\n]+[.。!！?？\n]*/g);
@@ -246,12 +476,6 @@ function runTtsStream(
 
     if (event.type === 'turn_done' || event.type === 'assistant_complete') {
       ttsDone = true;
-      // 之前是 textQueue.shift() 取第一项经 resolveNextChunk 传出去——但
-      // 这样会把 queue 里的剩余项也丢掉，且 turn_done 时没有人在等
-      // resolveNextChunk（textStream 多半已在走 queue 分支）这条分支根本
-      // 不会执行。改成无条件唤醒：resolved='' 是"自然结束"信号，
-      // textStream 醒后会继续走 while 循环把 queue 里所有剩余 chunk
-      // 排空，然后 ttsDone=true + queue 空 → 退出。
       if (resolveNextChunk) {
         resolveNextChunk('');
         resolveNextChunk = null;
@@ -267,9 +491,6 @@ function runTtsStream(
   (async () => {
     try {
       const config = loadConfig();
-      // 关键：bidirectionTtsStream 内部会覆盖 onAudioFrame（改成把帧 push 到
-      // 返回的 Readable），所以我们必须从 stream.on('data') 读音频帧。
-      // onFirstFrame / onChunk 没被覆盖，照常传 callback 即可。
       const stream = bidirectionTtsStream({
         appkey: config.tts.appkey,
         resourceId: config.tts.resourceId,
@@ -323,13 +544,15 @@ function runTtsStream(
     }
   })();
 
-  // 同步发起 agent 调用；textStream 会在 TTS 内部拉取
   sessionManager.sendMessage(sessionId, message).catch((err) => {
     log('[TTS] sendMessage error:', err);
   });
 }
 
-// Relay mode - connect to remote server instead of listening
+// ============================================================
+// Relay 模式 —— daemon 作为 Socket.IO client 连到 server
+// ============================================================
+
 async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
   const agent = new ClaudeAgent();
   const sessionManager = new SessionManager(agent);
@@ -354,9 +577,6 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
     console.log(`Openz daemon connected to server: ${serverUrl}`);
     socket.emit('daemon:register', { daemonId });
 
-    // 上报本地已加载的 session，让 server 建立 session→daemon 映射。
-    // 这条必不可少：每次重启 daemon 都会生成新的 daemonId（随机），
-    // 不上报的话 server 端从磁盘恢复不出 session，session:send / tts:start 都会 404。
     const loaded = sessionManager.getAllSessions();
     if (loaded.length > 0) {
       socket.emit('daemon:sessions', {
@@ -395,9 +615,8 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
 
       socket.emit('daemon:session_created', { daemonId, sessionId: session.id, session });
 
-      const response: SessionCreatedResponse = { session };
-      ack?.(response);
-      socket.emit('session:created', response);
+      ack?.({ session } satisfies SessionCreatedResponse);
+      socket.emit('session:created', { session } satisfies SessionCreatedResponse);
     } catch (err: any) {
       ack?.({ error: err.message });
     }
@@ -406,8 +625,7 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
   socket.on('session:send', async (req: SendMessageRequest, ack) => {
     log('session:send (relay)', req);
     try {
-      const entry = sessionManager.getSession(req.sessionId);
-      if (!entry) {
+      if (!sessionManager.getSession(req.sessionId)) {
         ack?.({ error: `Session ${req.sessionId} not found` });
         return;
       }
@@ -425,12 +643,16 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
     }
   });
 
-  // daemon:tts_start — 服务端转发的语音合成请求
+  // session:history —— server 转发客户端的增量/全量事件拉取
+  socket.on('session:history', (req: { sessionId: string; after?: number }, ack) => {
+    const events = sessionManager.getEvents(req.sessionId, req.after);
+    ack?.({ sessionId: req.sessionId, events });
+  });
+
   socket.on('daemon:tts_start', (req: { sessionId: string; message: string }, ack?: (r: any) => void) => {
     log('daemon:tts_start (relay)', req);
     try {
-      const entry = sessionManager.getSession(req.sessionId);
-      if (!entry) {
+      if (!sessionManager.getSession(req.sessionId)) {
         ack?.({ error: `Session ${req.sessionId} not found` });
         return;
       }
@@ -440,9 +662,7 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
         isOpen: () => socket.connected,
         sendAudio: (frame) => {
           if (!socket.connected) return false;
-          // 第一个参数是事件名，第二是二进制 buffer，附带的元数据放在 ack 后的对象里
-          // socket.io v4 支持 Buffer 作为 binary frame
-          socket.emit('daemon:tts_audio', { sessionId }, frame);
+          socket.emit('daemon:tts_audio', { sessionId }, frame as Buffer);
           return true;
         },
         sendEvent: (event) => {
@@ -452,8 +672,6 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
         },
       };
 
-      // 同时把 agent 的事件转发到 server（→ web），让 UI 也能渲染文字。
-      // 没这层的话 runTtsStream 内部的 onEvent 只喂火山，web 端"听得到看不到"。
       const forwardEvent = (event: AgentEvent) => {
         if (!socket.connected) return;
         socket.emit('daemon:session_event', { sessionId, event });
@@ -479,9 +697,7 @@ async function startDaemonRelayMode(daemonId: string, serverUrl: string) {
   });
 
   socket.on('session:list', (_, ack) => {
-    const sessions = sessionManager.getAllSessions();
-    const response: SessionListResponse = { sessions };
-    ack?.(response);
+    ack?.({ sessions: sessionManager.getAllSessions() } satisfies SessionListResponse);
   });
 
   socket.on('session:delete', (req: SessionRequest, ack) => {

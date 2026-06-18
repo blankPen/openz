@@ -8,3 +8,7 @@ dist/
 .claude/
 *.local
 **/.playwright-cli/
+coverage/
+package-lock.json
+yarn.lock
+__PHASE_*_DONE.md

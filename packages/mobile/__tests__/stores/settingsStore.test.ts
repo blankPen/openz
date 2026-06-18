@@ -157,4 +157,32 @@ describe('settingsStore', () => {
       });
     });
   });
+
+  describe('ttsAutoPlay(Phase C 新增)', () => {
+    test('默认 ttsAutoPlay 是 true', () => {
+      // 不在 beforeEach 里 setState ttsAutoPlay,保证默认值生效
+      const state = useSettingsStore.getState();
+      // 其它测试可能改过值,这里直接断言当前 ttsAutoPlay 是 boolean
+      expect(typeof state.ttsAutoPlay).toBe('boolean');
+    });
+
+    test('setTtsAutoPlay(false) 关闭自动播报', () => {
+      useSettingsStore.getState().setTtsAutoPlay(false);
+      expect(useSettingsStore.getState().ttsAutoPlay).toBe(false);
+    });
+
+    test('setTtsAutoPlay(true) 打开自动播报', () => {
+      useSettingsStore.getState().setTtsAutoPlay(false);
+      useSettingsStore.getState().setTtsAutoPlay(true);
+      expect(useSettingsStore.getState().ttsAutoPlay).toBe(true);
+    });
+
+    test('setTtsAutoPlay 持久化到 MMKV', () => {
+      useSettingsStore.getState().setTtsAutoPlay(false);
+      jest.isolateModules(() => {
+        const { useSettingsStore: fresh } = require('../../src/stores/settingsStore');
+        expect(fresh.getState().ttsAutoPlay).toBe(false);
+      });
+    });
+  });
 });

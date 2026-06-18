@@ -1,10 +1,12 @@
 import type { Session, AgentEvent } from '@openz/shared';
 import { generateSessionId } from '@openz/shared';
 import type { Agent, AgentSession } from '../agents/mod.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync } from 'fs';
 import { join } from 'path';
 
-const SESSIONS_FILE = join(process.env.HOME || '/tmp', '.openz', 'sessions.json');
+const HOME = process.env.HOME || '/tmp';
+const SESSIONS_FILE = join(HOME, '.openz', 'sessions.json');
+const EVENTS_DIR = join(HOME, '.openz', 'sessions');
 
 export class SessionManager {
   private sessions = new Map<string, {
@@ -17,19 +19,20 @@ export class SessionManager {
     this.loadSessions();
   }
 
+  // ==========================================================
+  // 持久化：会话元数据
+  // ==========================================================
+
   private loadSessions() {
     try {
       if (existsSync(SESSIONS_FILE)) {
         const data = readFileSync(SESSIONS_FILE, 'utf-8');
         const arr: Session[] = JSON.parse(data);
-        // Note: agentSession cannot be restored, so sessions are loaded as metadata only
-        // They will be recreated when actually used
         arr.forEach(s => {
-          // Mark as disconnected since we can't restore the actual agent session
           s.status = 'disconnected';
           this.sessions.set(s.id, {
             session: s,
-            agentSession: null as any, // Will be recreated on use
+            agentSession: null as any,
           });
         });
         console.log(`[SessionManager] Loaded ${arr.length} sessions from disk`);
@@ -41,16 +44,71 @@ export class SessionManager {
 
   private saveSessions() {
     try {
-      const dir = join(process.env.HOME || '/tmp', '.openz');
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      if (!existsSync(join(HOME, '.openz'))) mkdirSync(join(HOME, '.openz'), { recursive: true });
       const arr = Array.from(this.sessions.values())
-        .filter(e => e.session.status !== 'running') // Don't save running sessions
+        .filter(e => e.session.status !== 'running')
         .map(e => e.session);
       writeFileSync(SESSIONS_FILE, JSON.stringify(arr, null, 2));
     } catch (e) {
       console.error('[SessionManager] Failed to save sessions:', e);
     }
   }
+
+  // ==========================================================
+  // 持久化：事件 JSONL
+  // ==========================================================
+
+  /**
+   * 追加一条事件到会话的 events.jsonl 文件。
+   * 由 onEvent wrapper 自动调用，外部无需关心。
+   */
+  private appendEvent(event: AgentEvent) {
+    try {
+      const dir = join(EVENTS_DIR, event.sessionId);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      appendFileSync(join(dir, 'events.jsonl'), JSON.stringify(event) + '\n');
+    } catch (e) {
+      console.error(`[SessionManager] Failed to persist event seq=${event.seq}:`, e);
+    }
+  }
+
+  /**
+   * 读取会话的全部事件，支持增量（afterSeq）。
+   * @param sessionId 会话 ID
+   * @param afterSeq  仅返回 seq > afterSeq 的事件
+   */
+  getEvents(sessionId: string, afterSeq?: number): AgentEvent[] {
+    const file = join(EVENTS_DIR, sessionId, 'events.jsonl');
+    if (!existsSync(file)) return [];
+    try {
+      const raw = readFileSync(file, 'utf-8').trim();
+      if (!raw) return [];
+      const events = raw.split('\n').map(l => JSON.parse(l) as AgentEvent);
+      if (afterSeq !== undefined) return events.filter(e => e.seq > afterSeq);
+      return events;
+    } catch (e) {
+      console.error(`[SessionManager] Failed to read events for ${sessionId}:`, e);
+      return [];
+    }
+  }
+
+  /**
+   * 删除会话的事件目录。
+   */
+  private cleanupEventFiles(sessionId: string) {
+    const dir = join(EVENTS_DIR, sessionId);
+    try {
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    } catch (e) {
+      console.error(`[SessionManager] Failed to clean up events for ${sessionId}:`, e);
+    }
+  }
+
+  // ==========================================================
+  // 会话生命周期
+  // ==========================================================
 
   async createSession(options: {
     id?: string;
@@ -62,11 +120,17 @@ export class SessionManager {
     const id = options.id || generateSessionId();
     const cwd = options.cwd || process.cwd();
 
+    // 包装 onEvent：先持久化，再转发给调用方
+    const userOnEvent = options.onEvent;
+    const wrappedOnEvent = (event: AgentEvent) => {
+      this.appendEvent(event);
+      userOnEvent?.(event);
+    };
+
     // Check if session already exists (restored from disk)
     const existing = this.sessions.get(id);
     if (existing && existing.agentSession) {
-      // Reuse existing session
-      existing.onEvent = options.onEvent;
+      existing.onEvent = wrappedOnEvent;
       existing.session.status = 'idle';
       this.saveSessions();
       return existing.session;
@@ -85,10 +149,10 @@ export class SessionManager {
       id,
       cwd,
       model: options.model,
-      onEvent: options.onEvent || (() => {}),
+      onEvent: wrappedOnEvent,
     });
 
-    this.sessions.set(id, { session, agentSession, onEvent: options.onEvent });
+    this.sessions.set(id, { session, agentSession, onEvent: wrappedOnEvent });
     this.saveSessions();
     return session;
   }
@@ -117,6 +181,25 @@ export class SessionManager {
       }
       this.sessions.delete(id);
       this.saveSessions();
+      this.cleanupEventFiles(id);
+    }
+  }
+
+  // ==========================================================
+  // 消息发送
+  // ==========================================================
+
+  /**
+   * 设置会话的事件回调（由 daemon server 调用）。
+   * 自动包装持久化逻辑。
+   */
+  setOnEvent(sessionId: string, onEvent: (event: AgentEvent) => void) {
+    const entry = this.sessions.get(sessionId);
+    if (entry) {
+      entry.onEvent = (event: AgentEvent) => {
+        this.appendEvent(event);
+        onEvent(event);
+      };
     }
   }
 
@@ -126,19 +209,20 @@ export class SessionManager {
 
     // Recreate agent session if needed (e.g., after daemon restart)
     if (!entry.agentSession) {
+      // entry.onEvent 已经由 createSession 或 setOnEvent 包装过
+      const onEvent = entry.onEvent || ((event: AgentEvent) => { this.appendEvent(event); });
       entry.agentSession = await this.agent.createSession({
         id: sessionId,
         cwd: entry.session.cwd,
         model: entry.session.model,
-        onEvent: entry.onEvent || (() => {}),
+        onEvent,
       });
       entry.session.status = 'idle';
     }
 
-    // Update agent session's onEvent to use the current handler
-    // This ensures events flow through the correct handler set by session:send
+    // 确保 agent session 的 onEvent 指向最新包装后的回调
     if (entry.agentSession) {
-      entry.agentSession.onEvent = entry.onEvent || (() => {});
+      entry.agentSession.onEvent = entry.onEvent || ((event: AgentEvent) => { this.appendEvent(event); });
     }
 
     await this.agent.sendMessage(sessionId, message);
@@ -159,13 +243,6 @@ export class SessionManager {
       }
       entry.session.status = 'done';
       this.saveSessions();
-    }
-  }
-
-  setOnEvent(sessionId: string, onEvent: (event: AgentEvent) => void) {
-    const entry = this.sessions.get(sessionId);
-    if (entry) {
-      entry.onEvent = onEvent;
     }
   }
 }

@@ -1,10 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// protocols mock
-const mockSend = vi.fn()
-const mockReceive = vi.fn()
+// ---- protocols mock ----
+const capturedPayloads: string[] = []
 
-vi.mock('../../../protocols.js', () => ({
+const {
+  mockStartConnection,
+  mockStartSession,
+  mockTaskRequest,
+  mockFinishSession,
+  mockFinishConnection,
+  mockReceive,
+  mockWaitForEvent,
+} = vi.hoisted(() => {
+  /** 工厂：mock 带 payload 的协议函数（StartSession / TaskRequest） */
+  const capturePayload = () =>
+    vi.fn((_ws: any, payload: Uint8Array, _sessionId?: string) => {
+      capturedPayloads.push(new TextDecoder().decode(payload))
+      return Promise.resolve()
+    })
+
+  return {
+    mockStartConnection: vi.fn((_ws: any) => Promise.resolve()),
+    mockStartSession: capturePayload(),
+    mockTaskRequest: capturePayload(),
+    // FinishSession 签名: (ws, sessionId) — 无 payload
+    mockFinishSession: vi.fn((_ws: any, _sessionId: string) => Promise.resolve()),
+    mockFinishConnection: vi.fn((_ws: any) => Promise.resolve()),
+    mockReceive: vi.fn(),
+    mockWaitForEvent: vi.fn()
+      .mockResolvedValueOnce({ type: 9, event: 50 })   // ConnectionStarted
+      .mockResolvedValueOnce({ type: 9, event: 150 }), // SessionStarted
+  }
+})
+
+vi.mock('../../../src/daemon/volcengine/protocols.js', () => ({
   MsgType: {
     FullServerResponse: 9,
     AudioOnlyServer: 11,
@@ -21,84 +50,64 @@ vi.mock('../../../protocols.js', () => ({
     FinishConnection: 2,
     ConnectionFinished: 52,
   },
-  StartConnection: mockSend,
-  // Cycle through expected events: ConnectionStarted(50) then SessionStarted(150)
-  WaitForEvent: vi.fn()
-    .mockResolvedValueOnce({ type: 9, event: 50 })
-    .mockResolvedValueOnce({ type: 9, event: 150 }),
-  StartSession: mockSend,
-  TaskRequest: mockSend,
-  FinishSession: mockSend,
-  FinishConnection: mockSend,
+  StartConnection: mockStartConnection,
+  StartSession: mockStartSession,
+  TaskRequest: mockTaskRequest,
+  FinishSession: mockFinishSession,
+  FinishConnection: mockFinishConnection,
   ReceiveMessage: mockReceive,
+  WaitForEvent: mockWaitForEvent,
 }))
 
 import { TTSManager } from '../../../src/daemon/volcengine/ttsManager.js'
 
-const sentPayloads: any[] = []
+/** 创建 WebSocket mock 工厂 */
+function makeMockWs() {
+  return {
+    on: vi.fn((event: string, handler: Function) => {
+      if (event === 'open') handler()
+    }),
+    once: vi.fn(),
+    removeListener: vi.fn(),
+    send: vi.fn((_data: any, cb: any) => { if (cb) cb() }),
+    close: vi.fn(),
+  }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  sentPayloads.length = 0
+  capturedPayloads.length = 0
+  mockWaitForEvent
+    .mockReset()
+    .mockResolvedValueOnce({ type: 9, event: 50 })   // ConnectionStarted
+    .mockResolvedValueOnce({ type: 9, event: 150 })  // SessionStarted
+  mockReceive.mockReset()
 })
 
 describe('TTSManager PCM format', () => {
   it('feedText sends TaskRequest with format=pcm and sample_rate=24000', async () => {
-    const mockWs = {
-      on: vi.fn((event: string, handler: Function) => {
-        if (event === 'open') handler() // fire open synchronously
-      }),
-      once: vi.fn((event: string, handler: Function) => {
-        if (event === 'error') {} // no-op for error handler
-      }),
-      send: vi.fn((data: any, cb: any) => {
-        sentPayloads.push(data)
-        if (cb) cb()
-      }),
-      close: vi.fn(),
-    }
-
     const manager = new TTSManager({
       appkey: 'test-key',
       resourceId: 'seed-tts-2.0',
       voiceType: 'saturn_zh_female_aojiaonvyou_tob',
       onAudio: vi.fn(),
-      ws: mockWs as any,
+      ws: makeMockWs() as any,
     })
 
     await manager.connect()
-    manager.feedText('测试中文')
+    await manager.feedText('测试中文')
 
-    const taskPayload = sentPayloads.find((p) =>
-      JSON.stringify(p).includes('TaskRequest'),
-    )
+    // TaskRequest 的 payload 在 capturedPayloads 中（StartSession 在前面）
+    const taskPayload = capturedPayloads.find((p) => p.includes('测试中文'))
     expect(taskPayload).toBeDefined()
-    const parsed = JSON.parse(taskPayload as any)
-    expect(parsed.req_params.format).toBe('pcm')
-    expect(parsed.req_params.sample_rate).toBe(24000)
+    const parsed = JSON.parse(taskPayload!)
+    expect(parsed.req_params.audio_params.format).toBe('pcm')
+    expect(parsed.req_params.audio_params.sample_rate).toBe(24000)
     expect(parsed.req_params.text).toBe('测试中文')
   })
 
   it('streamAudio calls onAudio for each AudioOnlyServer frame', async () => {
     const frames: Buffer[] = []
-    const mockWs = {
-      on: vi.fn((event: string, handler: Function) => {
-        if (event === 'open') handler()
-      }),
-      send: vi.fn((_, cb) => { if (cb) cb() }),
-      close: vi.fn(),
-    }
-
-    const manager = new TTSManager({
-      appkey: 'test-key',
-      resourceId: 'seed-tts-2.0',
-      voiceType: 'saturn_zh_female_aojiaonvyou_tob',
-      onAudio: (frame: Buffer) => frames.push(frame),
-      ws: mockWs as any,
-    })
-
-    await manager.connect()
-    manager.streamAudio()
 
     const pcm1 = Buffer.from([1, 2, 3, 4])
     const pcm2 = Buffer.from([5, 6, 7, 8])
@@ -107,42 +116,40 @@ describe('TTSManager PCM format', () => {
       .mockResolvedValueOnce({ type: 11, event: 352, payload: pcm2 })
       .mockResolvedValueOnce({ type: 9, event: 152 }) // SessionFinished
 
-    await new Promise((r) => setTimeout(r, 100))
+    const manager = new TTSManager({
+      appkey: 'test-key',
+      resourceId: 'seed-tts-2.0',
+      voiceType: 'saturn_zh_female_aojiaonvyou_tob',
+      onAudio: (frame: Buffer) => frames.push(frame),
+      ws: makeMockWs() as any,
+    })
+
+    await manager.connect()
+    await manager.run(['测试文本'])
 
     expect(frames.length).toBe(2)
     expect(frames[0].byteLength).toBe(4)
   })
 
   it('finish sends FinishSession then FinishConnection', async () => {
-    const mockWs = {
-      on: vi.fn((event: string, handler: Function) => {
-        if (event === 'open') handler()
-      }),
-      send: vi.fn((data: any, cb: any) => {
-        sentPayloads.push(data)
-        if (cb) cb()
-      }),
-      close: vi.fn(),
-    }
-
     const manager = new TTSManager({
       appkey: 'test-key',
       resourceId: 'seed-tts-2.0',
       voiceType: 'saturn_zh_female_aojiaonvyou_tob',
       onAudio: vi.fn(),
-      ws: mockWs as any,
+      ws: makeMockWs() as any,
     })
 
     await manager.connect()
     await manager.finish()
 
-    const hasSession = sentPayloads.some((p) =>
-      JSON.stringify(p).includes('FinishSession'),
-    )
-    const hasConn = sentPayloads.some((p) =>
-      JSON.stringify(p).includes('FinishConnection'),
-    )
-    expect(hasSession).toBe(true)
-    expect(hasConn).toBe(true)
+    // finish() 依次调用 FinishSession 和 FinishConnection
+    expect(mockFinishSession).toHaveBeenCalled()
+    expect(mockFinishConnection).toHaveBeenCalled()
+
+    // 验证调用顺序：FinishSession 先于 FinishConnection
+    const sessionIdx = mockFinishSession.mock.invocationCallOrder[0]
+    const connIdx = mockFinishConnection.mock.invocationCallOrder[0]
+    expect(sessionIdx).toBeLessThan(connIdx)
   })
 })

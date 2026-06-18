@@ -76,13 +76,18 @@ describe('ClaudeAgent', () => {
     it('emits text_delta with text content when streaming', () => {
       // Verify the event structure is correct for text_delta events
       const textDeltaEvent: AgentEvent = {
-        type: 'text_delta',
+        eventId: 'test-event-id',
         sessionId: 'test',
+        seq: 0,
+        timestamp: Date.now(),
+        type: 'text_delta',
         data: { text: 'Hello' },
       };
 
       expect(textDeltaEvent.type).toBe('text_delta');
-      expect(textDeltaEvent.data.text).toBe('Hello');
+      if (textDeltaEvent.type === 'text_delta') {
+        expect(textDeltaEvent.data.text).toBe('Hello');
+      }
     });
   });
 });

@@ -1,4 +1,5 @@
 import { query, type Query, type SDKMessage, type SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
+import { randomUUID } from 'crypto';
 import type { Agent, AgentSession } from './mod.js';
 import type { AgentEvent } from '@openz/shared';
 
@@ -14,6 +15,52 @@ interface ClaudeSession extends AgentSession {
 export class ClaudeAgent implements Agent {
   name = 'claude';
   private sessions = new Map<string, ClaudeSession>();
+  private seqCounters = new Map<string, number>();
+
+  // ---- seq 管理 ----
+
+  private nextSeq(sessionId: string): number {
+    const current = this.seqCounters.get(sessionId) ?? -1;
+    const next = current + 1;
+    this.seqCounters.set(sessionId, next);
+    return next;
+  }
+
+  // ---- 事件发射 ----
+
+  /**
+   * 发射一条 AgentEvent。
+   * 自动补全 eventId (UUID)、seq (自增)、timestamp。
+   * @param sessionId 会话 ID
+   * @param partial   事件 type + data（sessionId/eventId/seq/timestamp 由本方法自动填充）
+   */
+  private emit(
+    sessionId: string,
+    partial: { type: AgentEvent['type']; data: unknown },
+    extra?: string,
+  ) {
+    const eventId = randomUUID();
+    const seq = this.nextSeq(sessionId);
+    const timestamp = Date.now();
+
+    const event: AgentEvent = {
+      eventId,
+      sessionId,
+      seq,
+      timestamp,
+      ...partial,
+    } as AgentEvent;
+
+    const ts = new Date().toISOString().split('T')[1].slice(0, -1);
+    console.log(`[${ts}] [ClaudeAgent] emit: ${event.type} (seq=${seq})${extra ? ` (${extra})` : ''}`);
+
+    const session = this.sessions.get(sessionId);
+    if (session?.onEvent) {
+      session.onEvent(event);
+    }
+  }
+
+  // ---- 生命周期 ----
 
   async createSession(options: {
     id: string;
@@ -29,59 +76,43 @@ export class ClaudeAgent implements Agent {
       model: options.model,
       conversationHistory: [],
       onEvent: options.onEvent,
-      interrupt: () => {
-        // Will be set when query is running
-      },
-      stop: () => {
-        // Will be set when query is running
-      },
+      interrupt: () => {},
+      stop: () => {},
     };
 
     this.sessions.set(options.id, session);
     return session;
   }
 
-  private emit(sessionId: string, event: AgentEvent, extra?: string) {
-    const ts = new Date().toISOString().split('T')[1].slice(0, -1);
-    console.log(`[${ts}] [ClaudeAgent] emit: ${event.type}${extra ? ` (${extra})` : ''}`);
-    const session = this.sessions.get(sessionId);
-    if (session?.onEvent) {
-      session.onEvent(event);
-    }
-  }
+  // ---- 流式事件处理 ----
 
   private handleStreamEvent(session: ClaudeSession, sessionId: string, msg: SDKPartialAssistantMessage) {
-    const event = msg.event as any; // Use any to bypass strict type checking
+    const event = msg.event as any;
     const eventType = event.type as string;
     console.log(`[ClaudeAgent] stream_event: type=${eventType}`);
 
-    // Forward ALL events to frontend as-is with their raw data
+    // 透传原始事件（调试用）
     this.emit(sessionId, {
       type: 'raw_stream_event',
-      sessionId,
-      data: event,
+      data: { event },
     });
 
-    // Handle known events
     switch (eventType) {
       case 'content_block_delta': {
         const delta = event.delta;
         if (delta?.type === 'thinking_delta' && delta?.thinking) {
           this.emit(sessionId, {
             type: 'thinking_delta',
-            sessionId,
             data: { text: delta.thinking },
           });
         } else if (delta?.type === 'text_delta' && delta?.text) {
           this.emit(sessionId, {
             type: 'text_delta',
-            sessionId,
             data: { text: delta.text },
           });
         } else if (delta?.type === 'input_json_delta' && delta?.input) {
           this.emit(sessionId, {
             type: 'tool_use_input_delta',
-            sessionId,
             data: {
               tool_use_id: session.pendingToolUseId,
               input_json_delta: delta.input,
@@ -98,7 +129,6 @@ export class ClaudeAgent implements Agent {
           session.pendingToolUseId = toolUseId;
           this.emit(sessionId, {
             type: 'tool_use_start',
-            sessionId,
             data: {
               tool_use_id: toolUseId,
               name: contentBlock.name,
@@ -108,7 +138,6 @@ export class ClaudeAgent implements Agent {
         } else if (contentBlock?.type === 'thinking') {
           this.emit(sessionId, {
             type: 'thinking_start',
-            sessionId,
             data: {},
           });
         }
@@ -116,21 +145,16 @@ export class ClaudeAgent implements Agent {
       }
 
       case 'content_block_stop':
-        // Could emit content_block_complete event if needed
-        break;
-
       case 'message_stop':
-        // Message complete
-        break;
-
       case 'ping':
-        // Ignore ping events
         break;
 
       default:
         break;
     }
   }
+
+  // ---- 发送消息 ----
 
   async sendMessage(sessionId: string, message: string): Promise<void> {
     const session = this.sessions.get(sessionId);
@@ -141,18 +165,22 @@ export class ClaudeAgent implements Agent {
 
     console.log(`[ClaudeAgent] sendMessage start: "${message.slice(0, 50)}..."`);
 
-    // Emit message_start immediately so frontend can show placeholder
-    this.emit(sessionId, { type: 'message_start', sessionId, data: { messageId: `msg-${Date.now()}` } });
+    // message_start —— 前端用于占位
+    this.emit(sessionId, {
+      type: 'message_start',
+      data: { messageId: `msg-${Date.now()}` },
+    });
 
-    // Emit session start event
-    this.emit(sessionId, { type: 'session_init', sessionId, data: {} });
+    // session_init —— 标记会话活跃
+    this.emit(sessionId, {
+      type: 'session_init',
+      data: {},
+    });
 
     try {
       console.log(`[ClaudeAgent] creating query...`);
       const queryStart = Date.now();
 
-      // Note: SDK's query() takes a string prompt for single-turn
-      // For multi-turn support, we'd need to use the AsyncIterable approach
       const q = query({
         prompt: message,
         options: {
@@ -172,32 +200,26 @@ export class ClaudeAgent implements Agent {
       for await (const msg of q) {
         const iterStart = Date.now();
         msgCount++;
-        // Track conversation for potential multi-turn
         session.conversationHistory.push(msg);
 
         switch (msg.type) {
           case 'assistant':
             console.log(`[ClaudeAgent] msg[${msgCount}] assistant: ${JSON.stringify(msg.message.content?.[0])?.slice(0, 100)}`);
-            // text_delta is already emitted via stream_event (handleStreamEvent), do not emit again here
             if (msg.message.content?.[0]?.type === 'tool_use') {
-              // Handle tool_use content blocks in assistant messages
               const toolBlock = msg.message.content[0];
               const toolUseId = toolBlock.id || `tool-${Date.now()}`;
               session.pendingToolUseId = toolUseId;
               this.emit(sessionId, {
                 type: 'tool_use_start',
-                sessionId,
                 data: {
                   tool_use_id: toolUseId,
                   name: toolBlock.name,
                   input: toolBlock.input || {},
                 },
               });
-              // Emit input as delta
               if (toolBlock.input) {
                 this.emit(sessionId, {
                   type: 'tool_use_input_delta',
-                  sessionId,
                   data: {
                     tool_use_id: toolUseId,
                     input_json_delta: JSON.stringify(toolBlock.input),
@@ -206,52 +228,61 @@ export class ClaudeAgent implements Agent {
               }
             }
             break;
+
           case 'stream_event':
             this.handleStreamEvent(session, sessionId, msg as SDKPartialAssistantMessage);
             break;
+
           case 'result':
             console.log(`[ClaudeAgent] msg[${msgCount}] result: ${JSON.stringify(msg).slice(0, 200)}`);
-            // Check for error subtypes
             if ('subtype' in msg && (msg as any).subtype?.startsWith('error_')) {
               this.emit(sessionId, {
                 type: 'error',
-                sessionId,
                 data: { error: (msg as any).subtype },
               });
               session.status = 'done';
               return;
             }
-            // Normal completion
+            // 完成
             this.emit(sessionId, {
               type: 'assistant_complete',
-              sessionId,
-              data: msg,
+              data: { message: msg },
+            });
+            // 通知本轮结束
+            this.emit(sessionId, {
+              type: 'turn_done',
+              data: {},
             });
             session.status = 'done';
             console.log(`[ClaudeAgent] completed in ${Date.now() - startTime}ms`);
             return;
+
           case 'system':
             console.log(`[ClaudeAgent] msg[${msgCount}] system: ${(msg as any).subtype || 'unknown'}`);
             if ((msg as any).subtype === 'init') {
               this.emit(sessionId, {
                 type: 'session_init',
-                sessionId,
-                data: msg,
+                data: { message: msg },
               });
             }
             break;
+
           default:
             console.log(`[ClaudeAgent] msg[${msgCount}] unknown type: ${msg.type}`);
         }
         console.log(`[ClaudeAgent] msg processed in ${Date.now() - iterStart}ms`);
       }
 
+      // 循环正常结束（无 result 消息时的兜底）
       session.status = 'done';
+      this.emit(sessionId, {
+        type: 'turn_done',
+        data: {},
+      });
     } catch (err) {
       console.log(`[ClaudeAgent] error after ${Date.now() - startTime}ms: ${(err as Error).message}`);
       this.emit(sessionId, {
         type: 'error',
-        sessionId,
         data: { error: (err as Error).message || 'Unknown error' },
       });
       session.status = 'done';
