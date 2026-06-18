@@ -1,5 +1,5 @@
-import { HomeScreen } from '../src/screens/HomeScreen';
+import { ChatScreen } from '../src/screens/ChatScreen';
 
 export default function Index() {
-  return <HomeScreen />;
+  return <ChatScreen />;
 }

@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
-import { useSettingsStore, type ThemeMode } from '../../stores/settingsStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Avatar } from '../common/Avatar';
 import { Icon } from '../common/Icon';
 import { Switch } from './Switch';
@@ -62,47 +62,6 @@ function MenuItem({ icon, label, value, switchValue, onSwitchChange, onPress, da
   );
 }
 
-// ── ThemeToggle ───────────────────────────────────────────────────────────────
-
-function ThemeToggle({ value, onChange }: { value: ThemeMode; onChange: (m: ThemeMode) => void }) {
-  const { palette, tokens } = useTheme();
-  const options: { label: string; value: ThemeMode }[] = [
-    { label: '浅色', value: 'light' },
-    { label: '深色', value: 'dark' },
-    { label: '自动', value: 'system' },
-  ];
-
-  return (
-    <View style={[styles.themeToggle, { backgroundColor: palette.surface2 }]}>
-      {options.map((opt) => {
-        const active = opt.value === value;
-        return (
-          <Pressable
-            key={opt.value}
-            onPress={() => onChange(opt.value)}
-            style={[
-              styles.themeToggleBtn,
-              active && { backgroundColor: palette.bg, borderRadius: 8 },
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-          >
-            <Text
-              style={{
-                color: active ? palette.primary : palette.fg3,
-                fontSize: tokens.fontSize.sm,
-                fontWeight: active ? '600' : '400',
-              }}
-            >
-              {opt.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 // ── Section ──────────────────────────────────────────────────────────────────
 
 type SectionProps = { title: string; children: React.ReactNode };
@@ -124,9 +83,9 @@ function Section({ title, children }: SectionProps) {
 export function SettingsDrawer({ visible, onClose, testID }: Props) {
   const { palette, tokens } = useTheme();
   const translateX = useRef(new Animated.Value(-320)).current;
+  // 抽屉打开时背景遮罩透明度从 0 渐入到 0.45,关闭时渐出
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  const themeMode = useSettingsStore((s) => s.themeMode);
-  const setThemeMode = useSettingsStore((s) => s.setThemeMode);
   const voiceBroadcast = useSettingsStore((s) => s.voiceBroadcast);
   const setVoiceBroadcast = useSettingsStore((s) => s.setVoiceBroadcast);
   const enterToSend = useSettingsStore((s) => s.enterToSend);
@@ -135,24 +94,36 @@ export function SettingsDrawer({ visible, onClose, testID }: Props) {
   const language = useSettingsStore((s) => s.language);
 
   useEffect(() => {
-    Animated.timing(translateX, {
-      toValue: visible ? 0 : -320,
-      duration: 260,
-      useNativeDriver: true,
-    }).start();
-  }, [visible, translateX]);
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: visible ? 0 : -320,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: visible ? 0.45 : 0,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [visible, translateX, backdropOpacity]);
 
   const fontSizeLabel = { small: '小', standard: '标准', large: '大' }[fontSize];
   const languageLabel = { 'zh-CN': '中文', 'en-US': 'English' }[language];
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      {/* Backdrop */}
-      <Pressable
-        style={StyleSheet.absoluteFill}
-        onPress={onClose}
-        accessibilityLabel="关闭设置面板"
-      />
+      {/* 半透明遮罩 —— 设计稿要求抽屉展开时点击外部关闭,这里加可见遮罩 */}
+      <Animated.View
+        pointerEvents={visible ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: backdropOpacity }]}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="关闭设置面板"
+        />
+      </Animated.View>
 
       {/* Drawer */}
       <Animated.View
@@ -164,66 +135,63 @@ export function SettingsDrawer({ visible, onClose, testID }: Props) {
         ]}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Header / UserCard */}
-          <View style={[styles.userCard, { backgroundColor: palette.surface }]}>
-            <Avatar label="A" size={56} />
+          {/* Header / UserCard —— 设计稿 settings.html .drawer-head：
+             padding 60px 20px 18px，border-bottom: 1px solid var(--border) */}
+          <View style={[styles.userCard, { borderBottomColor: palette.border }]}>
+            <Avatar label="A" size={52} />
             <View style={styles.userInfo}>
-              <Text style={[styles.userName, { color: palette.fg, fontSize: tokens.fontSize.lg }]}>
+              <Text style={[styles.userName, { color: palette.fg, fontSize: 17 }]}>
                 Alex
               </Text>
               <View style={[styles.proBadge, { backgroundColor: palette.primarySoft }]}>
-                <Text style={{ color: palette.primary, fontSize: tokens.fontSize.xs, fontWeight: '600' }}>
+                <Text style={{ color: palette.primary, fontSize: 11, fontWeight: '600' }}>
                   免费版 · 升级 Pro
                 </Text>
               </View>
             </View>
           </View>
 
-          {/* Section 1: 通用 */}
+          {/* Section 1: 通用 —— 主题已锁定 light,不再提供外观切换控件 */}
           <Section title="通用">
-            {/* 外观行：icon + label + inline ThemeToggle */}
-            <Pressable
-              onPress={() => {}}
-              style={({ pressed }) => [
-                styles.menuItem,
-                { backgroundColor: pressed ? palette.surface : 'transparent' },
-              ]}
-            >
-              <Icon name="sun" size={18} color={palette.fg3} />
-              <Text style={[styles.menuLabel, { color: palette.fg, fontSize: tokens.fontSize.md }]}>外观</Text>
-              <ThemeToggle value={themeMode} onChange={setThemeMode} />
-            </Pressable>
-            <MenuItem icon="textSize" label="字体大小" value={fontSizeLabel} />
-            <MenuItem icon="lang" label="语言" value={languageLabel} />
+            <View>
+              <MenuItem icon="textSize" label="字体大小" value={fontSizeLabel + ' ›'} />
+              <MenuItem icon="lang" label="语言" value={languageLabel + ' ›'} />
+            </View>
           </Section>
 
           {/* Section 2: 智能助手 */}
           <Section title="智能助手">
-            <MenuItem icon="model" label="默认模型" value="OpenZ Z1" />
-            <MenuItem
-              icon="voice"
-              label="语音播报"
-              switchValue={voiceBroadcast}
-              onSwitchChange={setVoiceBroadcast}
-            />
-            <MenuItem
-              icon="send"
-              label="回车发送"
-              switchValue={enterToSend}
-              onSwitchChange={setEnterToSend}
-            />
+            <View>
+              <MenuItem icon="robot" label="默认模型" value="OpenZ Z1 ›" />
+              <MenuItem
+                icon="voice"
+                label="语音播报"
+                switchValue={voiceBroadcast}
+                onSwitchChange={setVoiceBroadcast}
+              />
+              <MenuItem
+                icon="quote"
+                label="回车发送"
+                switchValue={enterToSend}
+                onSwitchChange={setEnterToSend}
+              />
+            </View>
           </Section>
 
           {/* Section 3: 账户 */}
           <Section title="账户">
-            <MenuItem icon="sparkles" label="订阅 Pro" value="升级" onPress={() => {}} />
-            <MenuItem icon="chart" label="用量" value="查看" onPress={() => {}} />
+            <View>
+              <MenuItem icon="sparkles" label="订阅 Pro" value="解锁全部能力 ›" onPress={() => {}} />
+              <MenuItem icon="chart" label="用量与配额" value="68% 已用 ›" onPress={() => {}} />
+            </View>
           </Section>
 
           {/* Section 4: 其他 */}
           <Section title="其他">
-            <MenuItem icon="help" label="帮助" onPress={() => {}} />
-            <MenuItem icon="info" label="关于" onPress={() => {}} />
+            <View>
+              <MenuItem icon="help" label="帮助与反馈" value="›" onPress={() => {}} />
+              <MenuItem icon="info" label="关于 OpenZ" value="v 2.6.0 ›" onPress={() => {}} />
+            </View>
           </Section>
         </ScrollView>
 
@@ -260,56 +228,49 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 60, paddingBottom: 16 },
+  scrollContent: { paddingHorizontal: 12, paddingTop: 60, paddingBottom: 16 },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    gap: 12,
+    paddingBottom: 18,
+    borderBottomWidth: 1,
+    marginBottom: 18,
   },
   userInfo: { flex: 1 },
-  userName: { fontWeight: '700', marginBottom: 6 },
+  menuIcon: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userName: { fontWeight: '600', marginBottom: 6 },
   proBadge: {
     alignSelf: 'flex-start',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  section: { marginBottom: 20 },
+  section: { marginBottom: 18 },
   sectionTitle: {
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginLeft: 4,
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    marginLeft: 8,
   },
   sectionBody: {
-    borderRadius: 12,
-    overflow: 'hidden',
+    // 设计稿：扁平列表，无 surface 容器
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 40,
   },
   menuLabel: { flex: 1, fontWeight: '500' },
-  themeToggle: {
-    flexDirection: 'row',
-    marginHorizontal: 14,
-    marginVertical: 10,
-    borderRadius: 10,
-    padding: 3,
-  },
-  themeToggleBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
   footer: {
     borderTopWidth: 1,
     paddingHorizontal: 16,

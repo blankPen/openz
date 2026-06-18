@@ -32,11 +32,13 @@ describe('SettingsDrawer', () => {
     expect(getByText('订阅 Pro')).toBeTruthy();
   });
 
-  it('renders theme toggle options', () => {
-    const { getAllByText } = render(<SettingsDrawer visible onClose={jest.fn()} />, { wrapper });
-    expect(getAllByText('浅色').length).toBeGreaterThanOrEqual(1);
-    expect(getAllByText('深色').length).toBeGreaterThanOrEqual(1);
-    expect(getAllByText('自动').length).toBeGreaterThanOrEqual(1); // ThemeToggle has 自动
+  it('does not render theme toggle (主题已锁定 light)', () => {
+    const { queryByText } = render(<SettingsDrawer visible onClose={jest.fn()} />, { wrapper });
+    // 设计变更: 外观控制已移除,主题不可变
+    expect(queryByText('外观')).toBeNull();
+    expect(queryByText('浅色')).toBeNull();
+    expect(queryByText('深色')).toBeNull();
+    expect(queryByText('自动')).toBeNull();
   });
 
   it('renders logout button', () => {
@@ -47,6 +49,12 @@ describe('SettingsDrawer', () => {
   it('does not crash when visible is false', () => {
     const { queryByText } = render(<SettingsDrawer visible={false} onClose={jest.fn()} />, { wrapper });
     expect(queryByText('Alex')).toBeNull();
+  });
+
+  it('renders backdrop with accessibility label for click-to-close', () => {
+    const { getByLabelText } = render(<SettingsDrawer visible onClose={jest.fn()} />, { wrapper });
+    // 抽屉展开时遮罩可点击关闭
+    expect(getByLabelText('关闭设置面板')).toBeTruthy();
   });
 
   it('renders with testID', () => {
