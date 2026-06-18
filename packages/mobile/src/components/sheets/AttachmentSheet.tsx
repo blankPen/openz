@@ -29,7 +29,7 @@ const ENTRIES: Entry[] = [
 function EntryGrid() {
   const { palette, tokens } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', marginBottom: 20 }}>
+    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
       {ENTRIES.map((e) => (
         <Pressable
           key={e.label}
@@ -39,7 +39,7 @@ function EntryGrid() {
               flex: 1,
               alignItems: 'center',
               gap: 6,
-              paddingVertical: 14,
+              paddingVertical: 10,
               borderRadius: 12,
               backgroundColor: e.bg,
               opacity: pressed ? 0.6 : 1,
@@ -48,8 +48,8 @@ function EntryGrid() {
           accessibilityRole="button"
           accessibilityLabel={e.label}
         >
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: e.bg, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={e.icon as any} size={22} color={e.color} />
+          <View style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={e.icon as any} size={18} color={e.color} />
           </View>
           <Text style={{ color: palette.fg, fontSize: tokens.fontSize.xs, fontWeight: '500' }}>
             {e.label}
