@@ -1,28 +1,64 @@
 # Web 控制台
 
-Web 控制台是 Uran 项目的可视化界面，基于 React 开发，位于 `packages/web`。
+Web 控制台是 Openz 项目的可视化界面，基于 React 开发，位于 `packages/web`。
 
 ## 界面布局
 
 ```
 ┌──────────────────────────────────────────┐
-│  Header: Uran                            │
+│  Header: Openz                           │
 ├─────────────────────┬────────────────────┤
 │                     │                    │
-│   会话列表          │   聊天区域          │
-│   (sidebar)         │   (ChatView)        │
+│   Sidebar           │   主内容区          │
+│   (会话列表)        │   (根据路由显示)    │
 │                     │                    │
 │                     │                    │
-├─────────────────────┼────────────────────┤
-│  输入框            │   发送按钮          │
-└─────────────────────┴────────────────────┘
+├─────────────────────┴────────────────────┤
+└──────────────────────────────────────────┘
 ```
+
+## 页面路由
+
+采用 Hash 路由模式：
+
+| 路径 | 页面 | 说明 |
+|------|------|------|
+| `/#home` | HomeScreen | 首页，展示会话列表 |
+| `/#conversation` | ConversationScreen | 聊天会话页面 |
+| `/#settings` | SettingsScreen | 设置页面 |
+
+## 核心页面
+
+### HomeScreen (`screens/HomeScreen.tsx`)
+
+首页，展示会话列表和创建新会话入口。
+
+### ConversationScreen (`screens/ConversationScreen.tsx`)
+
+聊天会话界面，包含：
+- 消息列表（支持流式输出）
+- 输入框
+- 思考气泡（可折叠 + 编号步骤）
+- 模型切换按钮
+- 附件按钮
+
+### SettingsScreen (`screens/SettingsScreen.tsx`)
+
+设置页面，提供模型选择等配置。
 
 ## 核心组件
 
+### ModelSwitchModal (`components/ModelSwitchModal.tsx`)
+
+模型切换弹窗，支持选择不同的 Claude 模型。
+
+### AttachmentModal (`components/AttachmentModal.tsx`)
+
+附件上传弹窗，支持添加文件附件到对话。
+
 ### ChatView (`components/ChatView.tsx`)
 
-主聊天界面，包含消息列表和输入框。
+主聊天界面，包含消息列表和输入框（保留用于兼容）。
 
 ### Message (`components/Message.tsx`)
 
@@ -85,3 +121,17 @@ interface Message {
   isStreaming?: boolean;
 }
 ```
+
+## 流式输出状态
+
+在 Agent 响应过程中，界面显示：
+- 思考气泡（可折叠，显示思考步骤）
+- 'OpenZ 正在回复…' 加载提示
+- spinner 动画
+
+## 历史会话恢复
+
+Web 端支持恢复历史会话：
+- `session:list` 获取会话列表
+- `session:create` 可指定 `id` 恢复已有会话
+- 断开重连后自动尝试恢复上次会话
