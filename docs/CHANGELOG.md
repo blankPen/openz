@@ -30,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Agent 事件模型重构**
   - `AgentEvent` 新增 `eventId`（UUID v4 全局唯一）、`seq`（单调递增序号）、`timestamp`（Unix ms）
   - 各事件 `data` 字段强类型化
-  - `ToolResultData` 新增 `isError` 字段
 
 - **会话历史**
   - `GET /sessions/:id/events` 接口支持历史事件查询

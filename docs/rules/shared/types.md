@@ -72,7 +72,6 @@ interface AssistantCompleteData { message: unknown }   // Assistant 消息块处
 interface ToolResultData {                            // 工具执行结果
   tool_use_id: string;
   content: string;
-  isError?: boolean;          // 标记工具执行是否出错
 }
 interface TurnDoneData {}                             // 轮次结束
 interface RawStreamEventData { event: unknown }       // 原始 SDK 流事件（调试用）
