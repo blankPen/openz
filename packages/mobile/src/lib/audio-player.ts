@@ -20,6 +20,11 @@ import {
   AudioBufferQueueSourceNode,
 } from 'react-native-audio-api';
 
+/** 是否为 Web（浏览器标准 AudioContext，无 createBufferQueueSource） */
+const IS_WEB = typeof window !== 'undefined' &&
+  typeof window.AudioContext !== 'undefined' &&
+  !('createBufferQueueSource' in window.AudioContext.prototype);
+
 /** Int16 → Float32 [-1,1] 的归一化系数 */
 const INT16_DIVISOR = 32768;
 
@@ -61,6 +66,16 @@ export class PCMPlayer {
     this.sampleRate = options.sampleRate ?? 24000;
     this.channels = options.channels ?? 1;
     this.flushTimeMs = options.flushTime ?? 100;
+
+    if (IS_WEB) {
+      // Web 环境：使用标准 AudioContext + AudioBufferSourceNode
+      this.audioCtx = new AudioContext({ sampleRate: this.sampleRate });
+      this.gainNode = this.audioCtx.createGain();
+      this.gainNode.connect(this.audioCtx.destination);
+      // Web 上无 createBufferQueueSource，使用空数组占位，play() 时创建一次性 source
+      this.source = null as any;
+      return;
+    }
 
     // 创建 AudioContext(sampleRate 必须显式传入,RN 端无默认)
     this.audioCtx = new AudioContext({ sampleRate: this.sampleRate });
@@ -112,7 +127,7 @@ export class PCMPlayer {
   }
 
   /**
-   * 把累积的 samples 转成 AudioBuffer 并 enqueue 到 source。
+   * 把累积的 samples 转成 AudioBuffer 并 enqueue 到 source（RN）或直接播放（Web）。
    * 空队列时是 no-op。
    * 显式调用可用于测试 / 立即刷出缓冲。
    */
@@ -137,7 +152,15 @@ export class PCMPlayer {
       }
     }
 
-    this.source.enqueueBuffer(audioBuffer);
+    if (IS_WEB) {
+      // Web：创建一次性 AudioBufferSourceNode 播放
+      const source = this.audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.gainNode);
+      source.start();
+    } else {
+      this.source.enqueueBuffer(audioBuffer);
+    }
 
     // 重置累积器
     this.samples = new Float32Array();
@@ -154,6 +177,7 @@ export class PCMPlayer {
     if (this.closed) return;
     this.samples = new Float32Array();
     this.accumulatedDurationSec = 0;
+    if (IS_WEB || !this.source) return;
     try {
       this.source.clearBuffers();
     } catch {
@@ -173,11 +197,13 @@ export class PCMPlayer {
       this.interval = null;
     }
     this.samples = new Float32Array();
-    try {
-      this.source.clearBuffers();
-      this.source.stop();
-    } catch {
-      // 忽略
+    if (!IS_WEB && this.source) {
+      try {
+        this.source.clearBuffers();
+        this.source.stop();
+      } catch {
+        // 忽略
+      }
     }
     void this.audioCtx.close().catch(() => {
       // RN 端 close() 一般立即 resolve,但写防御
