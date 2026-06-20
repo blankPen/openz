@@ -37,3 +37,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Session persistence path updated to `~/.openz/sessions.json`
+
+## [0.4.0] - 2026-06-19
+
+### Added
+- **Optimizer Agent** (`.agents/optimizer/`) - Self-optimization agent for OpenZ squad
+  - `optimizer.js` - Main optimization loop integrating all tasks
+  - `tasks/collect_issues.js` - Issue data collection module (fetches stats from Multica)
+  - `tasks/detect_anomalies.js` - Three-dimensional anomaly detection engine
+  - `tasks/config_version.js` - Config version management and daily report posting
+- **Anomaly Detection Dimensions**:
+  - Task Allocation: unassigned issues (>24h), blocked issues not escalated (>3 days)
+  - Automation: creation storms (>10 issues/day), unprocessed automation issues (>7 days)
+  - Collaboration: no interaction (>14 days), completed without review (<2h)
+- **Daily Report System**: Posts analysis reports to PZ-124 issue via Multica CLI
+
+### Changed
+- Project ID configured for Multica integration: `53387db1-782e-4b07-a190-d96c7ea787bc`
