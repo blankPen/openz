@@ -75,9 +75,9 @@ Examples:
       const portArg = subArgs.findIndex((arg, i) => arg === '--port' && subArgs[i + 1]);
       const serverArg = subArgs.findIndex((arg, i) => arg === '--server' && subArgs[i + 1]);
       const port = portArg !== -1 ? parseInt(subArgs[portArg + 1], 10) : DEFAULT_PORT;
-      // --server 缺省走 config.serverUrl；config 也缺省到 ws://localhost:19998
+      // 无 --server 时走 direct mode（serverUrl 为空则不连 relay）
       const config = loadConfig();
-      const serverUrl = serverArg !== -1 ? subArgs[serverArg + 1] : config.serverUrl;
+      const serverUrl = serverArg !== -1 ? subArgs[serverArg + 1] : '';
       await startDaemon(port, serverUrl);
     } else if (action === 'stop') {
       await stopDaemon();
