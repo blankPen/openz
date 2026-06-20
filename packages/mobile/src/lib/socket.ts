@@ -14,12 +14,12 @@ import { useSettingsStore } from '../stores/settingsStore';
 
 const log = (...args: unknown[]) => console.log('[mobile/socket]', ...args);
 
-/** Socket.IO 默认配置（移动端推荐 WebSocket 单传输） */
+/** Socket.IO 默认配置（移动端推荐 WebSocket + polling 回退） */
 export const DEFAULT_SOCKET_OPTIONS: Partial<ManagerOptions & SocketOptions> = {
   reconnection: true,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'],
 };
 
 const socketCache = new Map<string, Socket>();

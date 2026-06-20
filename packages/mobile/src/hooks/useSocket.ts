@@ -91,6 +91,11 @@ export function useClientPing(intervalMs: number = 30000): void {
  * 暴露 _ 前缀用于测试。
  */
 export function _setupSocketConnection(socket: Socket): void {
+  // 如果 socket 已经连接，立即更新状态
+  if (socket.connected) {
+    useConnectionStore.getState().markConnected();
+  }
+
   socket.on('connect', () => {
     useConnectionStore.getState().markConnected();
   });

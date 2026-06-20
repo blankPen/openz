@@ -310,6 +310,7 @@ export function ChatScreen() {
       <ConnectionBar
         status={connStatus}
         sessionsLoading={sessionsQuery.isLoading}
+        sessionsError={sessionsQuery.isError}
         sessionCount={sessionsQuery.data?.length ?? 0}
         onPressSettings={() => setDrawerVisible(true)}
       />
@@ -398,20 +399,27 @@ export function ChatScreen() {
 function ConnectionBar({
   status,
   sessionsLoading,
+  sessionsError,
   sessionCount,
   onPressSettings,
 }: {
   status: 'connected' | 'connecting' | 'disconnected';
   sessionsLoading: boolean;
+  sessionsError: boolean;
   sessionCount: number;
   onPressSettings: () => void;
 }) {
-  if (status === 'connected') return null;
+  // sessions API 成功返回了数据，说明后端可达，视为已连接
+  const isApiConnected = !sessionsLoading && !sessionsError && sessionCount >= 0;
+  if (status === 'connected' || isApiConnected) return null;
+
   const bg = status === 'connecting' ? '#FFA500' : '#FF3B30';
-  const text =
-    status === 'connecting'
-      ? '正在连接...'
-      : `未连接 · 去设置 (${sessionCount} 个本地会话)`;
+  const text = status === 'connecting'
+    ? '正在连接...'
+    : sessionsError
+    ? `连接失败 · 去设置`
+    : `未连接 · 去设置 (${sessionCount} 个本地会话)`;
+
   return (
     <Pressable
       onPress={onPressSettings}
