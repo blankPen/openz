@@ -18,6 +18,14 @@ export interface ToolCall {
   sources?: SourceItem[];
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uri: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -27,6 +35,7 @@ export interface ChatMessage {
   toolCall?: ToolCall;
   timestamp: string; // "HH:mm" format
   isStreaming?: boolean;
+  attachments?: Attachment[];
 }
 
 export interface ModelOption {
