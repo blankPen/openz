@@ -1,12 +1,16 @@
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
+import { useCallback } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { BottomSheet } from './BottomSheet';
 import { Icon } from '../common/Icon';
 import { FileCard } from './FileCard';
+import { pickImage, takePhoto, pickDocument, requestMediaLibraryPermission } from '../../lib/attachment';
+import type { Attachment } from '../../types/chat';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
+  onAttachmentSelected?: (attachment: Attachment) => void;
   testID?: string;
 };
 
@@ -17,13 +21,14 @@ type Entry = {
   label: string;
   color: string;
   bg: string;
+  action: () => void;
 };
 
-const ENTRIES: Entry[] = [
-  { icon: 'image', label: '本地图片', color: '#1A66FF', bg: '#EAF1FF' },
-  { icon: 'doc', label: '本地文件', color: '#FF7A45', bg: '#FFE8DB' },
-  { icon: 'camera', label: '拍照', color: '#34A853', bg: '#E1F4E9' },
-  { icon: 'quote', label: '引用回复', color: '#8B5CF6', bg: '#F0E7FE' },
+const ENTRIES = (onPickImage: () => void, onTakePhoto: () => void, onPickDoc: () => void): Entry[] => [
+  { icon: 'image', label: '本地图片', color: '#1A66FF', bg: '#EAF1FF', action: onPickImage },
+  { icon: 'doc', label: '本地文件', color: '#FF7A45', bg: '#FFE8DB', action: onPickDoc },
+  { icon: 'camera', label: '拍照', color: '#34A853', bg: '#E1F4E9', action: onTakePhoto },
+  { icon: 'quote', label: '引用回复', color: '#8B5CF6', bg: '#F0E7FE', action: () => Alert.alert('提示', '引用回复功能开发中') },
 ];
 
 // ── Entry grid item ────────────────────────────────────────────────────────
@@ -32,7 +37,7 @@ function EntryItem({ entry, testID }: { entry: Entry; testID?: string }) {
   const { tokens } = useTheme();
   return (
     <Pressable
-      onPress={() => {}}
+      onPress={entry.action}
       testID={testID}
       style={({ pressed }) => [
         styles.entry,
@@ -57,17 +62,40 @@ function EntryItem({ entry, testID }: { entry: Entry; testID?: string }) {
   );
 }
 
-// ── Recent files —— 与设计稿 attachment.html 对齐 ──────────────────────────
-
-const RECENT_FILES = [
-  { name: '产品架构图_v2.png', path: '图片 · 2.4 MB', size: '昨天', fileType: 'img' as const },
-  { name: '竞品分析_Q2.pdf', path: 'PDF · 18 页 · 3.1 MB', size: '2 天前', fileType: 'pdf' as const },
-  { name: '用户访谈记录.xlsx', path: '表格 · 24 KB', size: '上周', fileType: 'xls' as const },
-];
-
 // ── AttachmentSheet ────────────────────────────────────────────────────────
 
-export function AttachmentSheet({ visible, onClose, testID }: Props) {
+export function AttachmentSheet({ visible, onClose, onAttachmentSelected, testID }: Props) {
+  const handlePickImage = useCallback(async () => {
+    const hasPermission = await requestMediaLibraryPermission();
+    if (!hasPermission) {
+      Alert.alert('权限不足', '需要相册权限才能选择图片');
+      return;
+    }
+    const attachment = await pickImage();
+    if (attachment) {
+      onAttachmentSelected?.(attachment);
+      onClose();
+    }
+  }, [onAttachmentSelected, onClose]);
+
+  const handleTakePhoto = useCallback(async () => {
+    const attachment = await takePhoto();
+    if (attachment) {
+      onAttachmentSelected?.(attachment);
+      onClose();
+    }
+  }, [onAttachmentSelected, onClose]);
+
+  const handlePickDocument = useCallback(async () => {
+    const attachment = await pickDocument();
+    if (attachment) {
+      onAttachmentSelected?.(attachment);
+      onClose();
+    }
+  }, [onAttachmentSelected, onClose]);
+
+  const entries = ENTRIES(handlePickImage, handleTakePhoto, handlePickDocument);
+
   return (
     <BottomSheet visible={visible} title="添加附件" onClose={onClose} testID={testID}>
       <ScrollView
@@ -77,23 +105,17 @@ export function AttachmentSheet({ visible, onClose, testID }: Props) {
       >
         {/* 4 entry grid */}
         <View style={styles.entryGrid}>
-          {ENTRIES.map((e) => (
+          {entries.map((e) => (
             <EntryItem key={e.label} entry={e} testID={`entry-${e.label}`} />
           ))}
         </View>
 
-        {/* 最近使用 */}
+        {/* 提示文字 */}
         <Text style={styles.sectionLabel}>最近使用</Text>
-        <View style={{ gap: 6 }}>
-          {RECENT_FILES.map((f) => (
-            <FileCard
-              key={f.name}
-              name={f.name}
-              path={f.path}
-              size={f.size}
-              fileType={f.fileType}
-            />
-          ))}
+        <View style={styles.emptyState}>
+          <Icon name="doc" size={32} color="#8E8E93" />
+          <Text style={styles.emptyText}>暂无最近使用的文件</Text>
+          <Text style={styles.emptyHint}>选择上方选项添加附件</Text>
         </View>
       </ScrollView>
     </BottomSheet>
@@ -130,5 +152,19 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 10,
     paddingHorizontal: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#3C3C43',
+    fontWeight: '500',
+  },
+  emptyHint: {
+    fontSize: 12,
+    color: '#8E8E93',
   },
 });
