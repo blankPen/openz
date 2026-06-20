@@ -25,7 +25,7 @@ type Persisted = {
 };
 
 const DEFAULTS: Persisted = {
-  serverUrl: '',
+  serverUrl: 'http://localhost:19999',
   themeMode: 'light',
   fontSize: 'standard',
   language: 'zh-CN',
