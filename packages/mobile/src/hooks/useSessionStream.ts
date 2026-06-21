@@ -14,11 +14,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import type { AgentEvent } from '@openz/shared';
 
-/** 日志开关（生产环境可设为 false 关闭） */
-const LOG_ENABLED = true;
-const log = (...args: unknown[]) => {
-  if (LOG_ENABLED) console.log('[mobile/sse]', ...args);
-};
+import createDebug from 'debug';
+const log = createDebug('openz:sse');
 
 export interface UseSessionStreamOptions {
   /** 每解析到一个事件触发 */
@@ -65,8 +62,10 @@ export function useSessionStream(
   }, [sessionId]);
 
   const sendMessage = useCallback(
-    async (text: string) => {
-      if (!sessionId) {
+    async (text: string, sessionIdOverride?: string) => {
+      // 支持外部传入 sessionId，避免被闭包捕获的过期 sessionId
+      const sid = sessionIdOverride ?? sessionId;
+      if (!sid) {
         log('sendMessage: no sessionId, skip');
         return;
       }
@@ -75,7 +74,7 @@ export function useSessionStream(
         log('✗ sendMessage: serverUrl 未配置');
         throw new Error('serverUrl 未配置');
       }
-      log('→ POST', `${serverUrl}/sessions/${sessionId}/send`, 'message=', JSON.stringify(text).slice(0, 60));
+      log('→ POST', `${serverUrl}/sessions/${sid}/send`, 'message=', JSON.stringify(text).slice(0, 60));
 
       // 取消上一次未完成请求
       if (abortRef.current) abortRef.current.abort();
@@ -84,7 +83,7 @@ export function useSessionStream(
 
       setIsStreaming(true);
       try {
-        const resp = await fetch(`${serverUrl}/sessions/${sessionId}/send`, {
+        const resp = await fetch(`${serverUrl}/sessions/${sid}/send`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

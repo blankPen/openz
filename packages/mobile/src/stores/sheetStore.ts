@@ -33,6 +33,10 @@ type SheetState = Persisted & {
   attachmentSheetVisible: boolean;
   openAttachmentSheet: () => void;
   closeAttachmentSheet: () => void;
+  // settings sheet
+  settingsVisible: boolean;
+  openSettings: () => void;
+  closeSettings: () => void;
   // generic
   openSheet: (key: SheetKey) => void;
   closeSheet: () => void;
@@ -49,6 +53,9 @@ export const useSheetStore = create<SheetState>((set) => ({
   attachmentSheetVisible: false,
   openAttachmentSheet: () => set({ attachmentSheetVisible: true }),
   closeAttachmentSheet: () => set({ attachmentSheetVisible: false }),
+  settingsVisible: false,
+  openSettings: () => set({ settingsVisible: true }),
+  closeSettings: () => set({ settingsVisible: false }),
   openSheet: (key) => {
     set({ activeSheet: key });
   },

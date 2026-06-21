@@ -26,8 +26,11 @@ import { Pill } from '../components/common/Pill';
 import { HistoryDrawer } from '../components/drawer/HistoryDrawer';
 import { ModelSwitchSheet } from '../components/sheets/ModelSwitchSheet';
 import { AttachmentSheet } from '../components/sheets/AttachmentSheet';
+import { SettingsScreen } from './SettingsScreen';
 import { sessionToConvMap, convToSessionMap } from '../lib/sessionMaps';
 import type { AgentEvent } from '@openz/shared';
+
+const chatLog = (...logs: any[]) => console.log('[ChatScreen] ', ...logs);
 
 /**
  * OpenZ 聊天屏幕（接入 daemon 后端）
@@ -70,10 +73,15 @@ export function ChatScreen() {
   const currentConvIdRef = useRef<string | null>(null);
   const tts = useTtsClient();
 
+  console.log('[ChatScreen] 渲染', { activeConvId, chatState, ttsAutoPlay });
+  chatLog("ChatScreen 渲染: activeConvId=%s chatState=%s ttsAutoPlay=%s", activeConvId, chatState, ttsAutoPlay);
+
   const handleSseEvent = useCallback(
     (event: AgentEvent, convId: string) => {
+      chatLog('SSE事件 type=%s seq=%s sessionId=%s convId=%s', event.type, event.seq, event.sessionId, convId);
       switch (event.type) {
         case 'message_start': {
+          chatLog('  → AI 开始回复');
           const msgId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
           streamingMessageIdRef.current = msgId;
           pendingTextRef.current = '';
@@ -92,6 +100,7 @@ export function ChatScreen() {
           pendingTextRef.current += text;
           const id = streamingMessageIdRef.current;
           if (id) updateMessage(convId, id, { content: pendingTextRef.current });
+          chatLog('  → 文本追加 len=%d total=%d text="%s"', text.length, pendingTextRef.current.length, text);
           break;
         }
         case 'thinking_delta': {
@@ -106,14 +115,16 @@ export function ChatScreen() {
               ? [...steps.slice(0, -1), { ...last, content: last.content + text }]
               : [...steps, { step: steps.length + 1, content: text }];
             updateMessage(convId, id, { thinkingSteps: newSteps });
+            chatLog('  → 思考追加 len=%d', text.length);
           }
           break;
         }
         case 'tool_use_start':
-          console.log('[ChatScreen] tool_use_start', event.data);
+          chatLog('  → 工具调用 name=%s', (event.data as { name?: string })?.name);
           break;
         case 'assistant_complete':
         case 'turn_done': {
+          chatLog('  → AI 回复完成 total=%d', pendingTextRef.current.length);
           const id = streamingMessageIdRef.current;
           if (id) updateMessage(convId, id, { isStreaming: false });
           streamingMessageIdRef.current = null;
@@ -126,7 +137,7 @@ export function ChatScreen() {
           break;
         }
         case 'error': {
-          const id = streamingMessageIdRef.current;
+          chatLog('  → 错误 event=%o', event.data);
           if (id) {
             updateMessage(convId, id, {
               isStreaming: false,
@@ -174,6 +185,7 @@ export function ChatScreen() {
   useEffect(() => {
     if (sessionsQuery.data && sessionsQuery.data.length > 0 && !activeConvId) {
       const first = sessionsQuery.data[0];
+      chatLog('加载历史会话列表: %d 条，默认选择 sessionId=%s', sessionsQuery.data.length, first.id);
       const convId = createConversation();
       sessionToConvMap.set(first.id, convId);
       convToSessionMap.set(convId, first.id);
@@ -190,6 +202,9 @@ export function ChatScreen() {
     attachmentSheetVisible,
     openAttachmentSheet,
     closeAttachmentSheet,
+    settingsVisible,
+    openSettings,
+    closeSettings,
   } = useSheetStore();
 
   const messages = activeConvId ? conversations[activeConvId]?.messages ?? [] : [];
@@ -212,6 +227,7 @@ export function ChatScreen() {
       Alert.alert('未配置服务器', '请在设置中配置 serverUrl');
       return;
     }
+    chatLog('新建会话...');
     try {
       const session = await createSessionMut.mutateAsync({ engine: 'claude', cwd: '/' });
       if (session) {
@@ -219,34 +235,25 @@ export function ChatScreen() {
         sessionToConvMap.set(session.id, convId);
         convToSessionMap.set(convId, session.id);
         setActiveConversation(convId);
+        chatLog('新建会话成功 sessionId=%s convId=%s', session.id, convId);
       }
     } catch (err: any) {
+      chatLog('新建会话失败: %s', err?.message);
       Alert.alert('创建会话失败', err?.message ?? String(err));
     }
   }, [serverUrl, createSessionMut, createConversation, setActiveConversation]);
 
-  const handleDeleteChat = useCallback(() => {
-    if (!activeConvId) return;
-    Alert.alert('删除会话', '确认删除当前会话？此操作不可恢复。', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除',
-        style: 'destructive',
-        onPress: async () => {
-          const sessionId = convToSessionMap.get(activeConvId);
-          deleteConversation(activeConvId);
-          if (sessionId) {
-            try {
-              await deleteSessionMut.mutateAsync(sessionId);
-            } catch {
-              /* 静默 */
-            }
-            sessionToConvMap.delete(sessionId);
-            convToSessionMap.delete(activeConvId);
-          }
-        },
-      },
-    ]);
+  const handleDeleteChat = useCallback(async () => {
+    chatLog('删除会话 ', activeConvId);
+    if (!activeConvId) throw new Error('没有 activeConvId');
+    chatLog('确认删除当前会话？此操作不可恢复。 ', activeConvId);
+    const sessionId = convToSessionMap.get(activeConvId);
+    deleteConversation(activeConvId);
+    if (sessionId) {
+      await deleteSessionMut.mutateAsync(sessionId);
+      sessionToConvMap.delete(sessionId);
+      convToSessionMap.delete(activeConvId);
+    }
   }, [activeConvId, deleteConversation, deleteSessionMut]);
 
   const handleSend = useCallback(
@@ -259,6 +266,7 @@ export function ChatScreen() {
       }
       let convId = activeConvId;
       if (!convId) {
+        chatLog('无 activeConvId，创建新会话...');
         try {
           const session = await createSessionMut.mutateAsync({ engine: 'claude', cwd: '/' });
           if (!session) return;
@@ -266,7 +274,9 @@ export function ChatScreen() {
           sessionToConvMap.set(session.id, convId);
           convToSessionMap.set(convId, session.id);
           setActiveConversation(convId);
+          chatLog('新会话创建成功 sessionId=%s convId=%s', session.id, convId);
         } catch (err: any) {
+          chatLog('创建会话失败: %s', err?.message);
           Alert.alert('创建会话失败', err?.message ?? String(err));
           return;
         }
@@ -280,11 +290,16 @@ export function ChatScreen() {
       });
       currentConvIdRef.current = convId;
       setChatState('streaming');
+      chatLog('发送消息 convId=%s text="%s"', convId, trimmed.slice(0, 50));
       try {
         const sessionId = convToSessionMap.get(convId);
         if (!sessionId) throw new Error('没有对应的 daemon sessionId');
-        await sessionStream.sendMessage(trimmed);
+        chatLog('调用 SSE sendMessage sessionId=%s', sessionId);
+        // 传入 sessionIdOverride 避免闭包捕获过期 sessionStream
+        await sessionStream.sendMessage(trimmed, sessionId);
+        chatLog('SSE sendMessage 完成（等待服务端响应）');
       } catch (err: any) {
+        chatLog('发送失败: %s', err?.message);
         Alert.alert('发送失败', err?.message ?? String(err));
         setChatState('idle');
         streamingMessageIdRef.current = null;
@@ -294,6 +309,7 @@ export function ChatScreen() {
   );
 
   const handleStop = useCallback(() => {
+    chatLog('停止生成...');
     sessionStream.abort();
     const id = streamingMessageIdRef.current;
     if (id && currentConvIdRef.current) {
@@ -380,7 +396,7 @@ export function ChatScreen() {
 
       <View style={{ height: insets.bottom, backgroundColor: palette.bg }} />
 
-      <HistoryDrawer visible={drawerVisible} onClose={handleDrawerClose} onNewChat={handleNewChat} testID="history-drawer" />
+      <HistoryDrawer visible={drawerVisible} onClose={handleDrawerClose} onNewChat={handleNewChat} onOpenSettings={openSettings} testID="history-drawer" />
       <ModelSwitchSheet
         visible={modelSheetVisible}
         onClose={closeModelSheet}
@@ -390,6 +406,11 @@ export function ChatScreen() {
         visible={attachmentSheetVisible}
         onClose={closeAttachmentSheet}
         testID="attachment-sheet"
+      />
+      <SettingsScreen
+        visible={settingsVisible}
+        onClose={closeSettings}
+        testID="settings-screen"
       />
     </View>
   );
@@ -417,8 +438,8 @@ function ConnectionBar({
   const text = status === 'connecting'
     ? '正在连接...'
     : sessionsError
-    ? `连接失败 · 去设置`
-    : `未连接 · 去设置 (${sessionCount} 个本地会话)`;
+      ? `连接失败 · 去设置`
+      : `未连接 · 去设置 (${sessionCount} 个本地会话)`;
 
   return (
     <Pressable

@@ -1,4 +1,4 @@
-import { View, Text } from 'react-native';
+import { View, Text, useWindowDimensions } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
@@ -36,12 +36,15 @@ function renderContent(text: string) {
 
 export function AIBubble({ content, timestamp }: Props) {
   const { palette, tokens } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const maxBubbleWidth = Math.min(screenWidth * 0.88, 400);
+
   return (
     <View style={{ alignItems: 'flex-start' }}>
       <View
         testID="ai-bubble"
         style={{
-          maxWidth: '88%',
+          maxWidth: maxBubbleWidth,
           backgroundColor: palette.surface,
           borderRadius: 18,
           borderTopLeftRadius: 4,
@@ -52,7 +55,9 @@ export function AIBubble({ content, timestamp }: Props) {
           paddingHorizontal: 14,
         }}
       >
-        <Text style={{ color: palette.fg, fontSize: tokens.fontSize.lg, lineHeight: tokens.fontSize.lg * 1.55 }}>
+        <Text
+          style={{ color: palette.fg, fontSize: tokens.fontSize.lg, lineHeight: tokens.fontSize.lg * 1.55 }}
+        >
           {renderContent(content)}
         </Text>
       </View>

@@ -2,6 +2,12 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { socket } from '../socket';
 import type { AgentEvent, Session } from '../types';
 
+function log(...args: unknown[]) {
+  const enabled = localStorage.getItem('debug') ?? '';
+  if (!enabled && enabled !== '*') return;
+  console.log('[openz:socket]', ...args);
+}
+
 export function useSocket() {
   const [connected, setConnected] = useState(socket.connected);
 
@@ -25,7 +31,12 @@ export function useSessions() {
 
   const refresh = () => {
     socket.emit('session:list', {}, (res: { sessions?: Session[]; error?: string }) => {
-      if (!res.error && res.sessions) setSessions(res.sessions);
+      if (!res.error && res.sessions) {
+        log('查询到历史会话 %d 条', res.sessions.length);
+        setSessions(res.sessions);
+      } else if (res.error) {
+        log('查询会话列表失败 error=%s', res.error);
+      }
     });
   };
 

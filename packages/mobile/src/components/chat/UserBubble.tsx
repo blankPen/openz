@@ -1,4 +1,4 @@
-import { View, Text } from 'react-native';
+import { View, Text, useWindowDimensions } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
@@ -8,12 +8,15 @@ type Props = {
 
 export function UserBubble({ content, timestamp }: Props) {
   const { palette, tokens } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const maxBubbleWidth = Math.min(screenWidth * 0.78, 360);
+
   return (
     <View style={{ alignItems: 'flex-end' }}>
       <View
         testID="user-bubble"
         style={{
-          maxWidth: '78%',
+          maxWidth: maxBubbleWidth,
           backgroundColor: palette.primary,
           borderRadius: 18,
           borderBottomRightRadius: 4,
@@ -21,7 +24,9 @@ export function UserBubble({ content, timestamp }: Props) {
           paddingHorizontal: 14,
         }}
       >
-        <Text style={{ color: '#FFFFFF', fontSize: tokens.fontSize.lg, lineHeight: tokens.fontSize.lg * 1.4 }}>
+        <Text
+          style={{ color: '#FFFFFF', fontSize: tokens.fontSize.lg, lineHeight: tokens.fontSize.lg * 1.4 }}
+        >
           {content}
         </Text>
       </View>

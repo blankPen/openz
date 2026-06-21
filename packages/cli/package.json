@@ -7,7 +7,7 @@
     "openz": "./dist/index.js"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts daemon restart",
+    "dev": "tsx watch src/index.ts daemon restart --server=ws://localhost:19999",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",

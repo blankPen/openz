@@ -5,7 +5,6 @@ import {
   Pressable,
   View,
   Text,
-  TextInput,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
@@ -23,6 +22,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onNewChat: () => void;
+  onOpenSettings: () => void;
   testID?: string;
 };
 
@@ -120,20 +120,14 @@ function SessionItem({ session, isActive, onPress, onDelete }: SessionItemProps)
 
 // ── HistoryDrawer ─────────────────────────────────────────────────────────────
 
-export function HistoryDrawer({ visible, onClose, onNewChat, testID }: Props) {
+export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, testID }: Props) {
   const { palette, tokens } = useTheme();
   const translateX = useRef(new Animated.Value(-320)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  // Settings
-  const serverUrl = useSettingsStore((s) => s.serverUrl);
-  const setServerUrl = useSettingsStore((s) => s.setServerUrl);
-  const [serverUrlDraft, setServerUrlDraft] = useState(serverUrl);
-  useEffect(() => setServerUrlDraft(serverUrl), [serverUrl]);
-  const saveServerUrl = () => setServerUrl(serverUrlDraft.trim());
-
   // Sessions
   const sessionsQuery = useSessions();
+  const serverUrl = useSettingsStore((s) => s.serverUrl);
   const deleteSessionMut = useDeleteSession();
 
   // Active conversation
@@ -173,7 +167,9 @@ export function HistoryDrawer({ visible, onClose, onNewChat, testID }: Props) {
     setActiveConversation(convId);
 
     // 加载历史消息（如果本地还没有消息）
-    const conv = conversations[convId];
+    // 注意：必须从 store 直接读取，避免闭包捕获过时的 conversations 副本
+    const currentConvs = useChatStore.getState().conversations;
+    const conv = currentConvs[convId];
     if (!conv || conv.messages.length === 0) {
       loadHistory(session.id, convId);
     }
@@ -315,51 +311,24 @@ export function HistoryDrawer({ visible, onClose, onNewChat, testID }: Props) {
             )}
           </View>
 
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: palette.border }]} />
-
-          {/* 连接配置 */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: palette.fg3, fontSize: tokens.fontSize.xs }]}>
-              连接
-            </Text>
-            <View style={styles.serverUrlBlock}>
-              <Text style={[styles.serverUrlLabel, { color: palette.fg3 }]}>Daemon URL</Text>
-              <TextInput
-                value={serverUrlDraft}
-                onChangeText={setServerUrlDraft}
-                placeholder="http://localhost:19999"
-                placeholderTextColor={palette.fg3}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                style={[
-                  styles.serverUrlInput,
-                  { color: palette.fg, borderColor: palette.border, backgroundColor: palette.surface },
-                ]}
-                testID="server-url-input"
-                onSubmitEditing={saveServerUrl}
-                returnKeyType="done"
-              />
-              <Pressable
-                onPress={saveServerUrl}
-                style={({ pressed }) => [
-                  styles.saveBtn,
-                  { backgroundColor: pressed ? palette.primarySoft : palette.primary },
-                ]}
-                testID="server-url-save"
-              >
-                <Text style={styles.saveBtnText}>保存</Text>
-              </Pressable>
-              <Text style={[styles.serverUrlHint, { color: palette.fg3 }]}>
-                当前: {serverUrl || '(未配置)'}
-              </Text>
-            </View>
-          </View>
         </ScrollView>
 
         {/* Footer */}
         <View style={[styles.footer, { borderTopColor: palette.border }]}>
+          <Pressable
+            onPress={onOpenSettings}
+            style={({ pressed }) => [
+              styles.settingsBtn,
+              { backgroundColor: pressed ? palette.surface : 'transparent' },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="设置"
+          >
+            <Icon name="gear" size={18} color={palette.fg2} />
+            <Text style={[styles.settingsText, { color: palette.fg, fontSize: tokens.fontSize.md }]}>
+              设置
+            </Text>
+          </Pressable>
           <Pressable
             onPress={() => {}}
             style={({ pressed }) => [
@@ -491,14 +460,28 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
+  settingsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  settingsText: { fontWeight: '500' },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    justifyContent: 'center',
-    paddingVertical: 13,
-    borderRadius: 12,
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
   },
-  logoutText: { fontWeight: '600' },
+  logoutText: { fontWeight: '500' },
 });

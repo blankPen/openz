@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { socket } from '../socket';
 import { useSessionEvents } from '../hooks/useSocket';
 import type { AgentEvent } from '../types';
+import { log } from '../lib/logger';
 
 interface ConversationScreenProps {
   sessionTitle: string;
@@ -46,12 +47,20 @@ export function ConversationScreen({ onOpenModelSwitch, onOpenAttachment }: Conv
 
   // Create session on mount
   useEffect(() => {
+    log.socket('创建新会话...');
     socket.emit('session:create', { cwd: '/tmp' }, (res: { session?: { id: string }; error?: string }) => {
-      if (res.session) setSessionId(res.session.id);
+      if (res.session) {
+        log.socket('会话已创建 id=%s', res.session.id);
+        setSessionId(res.session.id);
+      } else if (res.error) {
+        log.socket('会话创建失败 error=%s', res.error);
+      }
     });
   }, []);
 
   const handleEvent = useCallback((event: AgentEvent) => {
+    log.sse('收到事件 type=%s seq=%s sessionId=%s', event.type, event.seq, event.sessionId);
+
     switch (event.type) {
       case 'message_start': {
         const msgId = event.data.messageId as string;
@@ -62,7 +71,9 @@ export function ConversationScreen({ onOpenModelSwitch, onOpenAttachment }: Conv
       case 'text_delta': {
         const msgId = currentMessageIdRef.current;
         if (!msgId) break;
-        agentTextRef.current[msgId] = (agentTextRef.current[msgId] || '') + (event.data.text as string);
+        const deltaText = (event.data.text as string) ?? '';
+        agentTextRef.current[msgId] = (agentTextRef.current[msgId] || '') + deltaText;
+        log.sse('text_delta len=%d total=%d text=%s', deltaText.length, agentTextRef.current[msgId].length, deltaText);
         setMessages(prev => prev.map(m =>
           m.messageId === msgId ? { ...m, text: agentTextRef.current[msgId] } : m,
         ));
@@ -129,6 +140,7 @@ export function ConversationScreen({ onOpenModelSwitch, onOpenAttachment }: Conv
       }
       case 'assistant_complete':
       case 'turn_done': {
+        log.sse('会话完成 type=%s', event.type);
         setSending(false);
         sendingRef.current = false;
         currentMessageIdRef.current = null;
@@ -156,6 +168,7 @@ export function ConversationScreen({ onOpenModelSwitch, onOpenAttachment }: Conv
 
   const send = useCallback((text: string) => {
     if (!text.trim() || sendingRef.current || !sessionId) return;
+    log.session('发送消息 sessionId=%s text=%s', sessionId, text.slice(0, 50));
     sendingRef.current = true;
     setSending(true);
 
@@ -174,9 +187,12 @@ export function ConversationScreen({ onOpenModelSwitch, onOpenAttachment }: Conv
 
     socket.emit('session:send', { sessionId, message: text }, (res: { error?: string }) => {
       if (res.error) {
+        log.session('发送失败 error=%s', res.error);
         setMessages(prev => [...prev, { id: `error-${Date.now()}`, type: 'error', text: `Error: ${res.error}` }]);
         setSending(false);
         sendingRef.current = false;
+      } else {
+        log.session('发送成功，等待服务端响应...');
       }
     });
   }, [sessionId]);

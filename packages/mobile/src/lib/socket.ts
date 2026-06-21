@@ -12,7 +12,8 @@
 import { io, Socket, ManagerOptions, SocketOptions } from 'socket.io-client';
 import { useSettingsStore } from '../stores/settingsStore';
 
-const log = (...args: unknown[]) => console.log('[mobile/socket]', ...args);
+import createDebug from 'debug';
+const log = createDebug('openz:socket');
 
 /** Socket.IO 默认配置（移动端推荐 WebSocket + polling 回退） */
 export const DEFAULT_SOCKET_OPTIONS: Partial<ManagerOptions & SocketOptions> = {

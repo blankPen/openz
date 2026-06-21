@@ -13,11 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettingsStore } from '../stores/settingsStore';
 import type { CreateSessionRequest, Session } from '@openz/shared';
 
-/** 日志开关（生产环境可设为 false 关闭） */
-const LOG_ENABLED = true;
-const log = (...args: unknown[]) => {
-  if (LOG_ENABLED) console.log('[mobile/http]', ...args);
-};
+import createDebug from 'debug';
+const log = createDebug('openz:http');
 
 const STALE_TIME = 30 * 1000;
 
@@ -58,8 +55,9 @@ async function createSessionApi(
   log('← POST /sessions', resp.status, 'in', Date.now() - t0, 'ms');
   if (!resp.ok) throw new Error(`createSession: ${resp.status}`);
   const data = await resp.json();
-  log('  created session id=', data.session?.id);
-  return data.session;
+  const session = data.session ?? data;
+  log('  created session id=', session?.id);
+  return session;
 }
 
 /** DELETE /sessions/:id */
