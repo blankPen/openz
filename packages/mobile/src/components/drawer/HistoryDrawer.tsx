@@ -5,6 +5,7 @@ import {
   Pressable,
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
@@ -15,6 +16,7 @@ import { useChatStore } from '../../stores/chatStore';
 import { useSessions, useDeleteSession } from '../../hooks/useSessions';
 import { Avatar } from '../common/Avatar';
 import { Icon } from '../common/Icon';
+import { ActionSheet } from '../sheets/ActionSheet';
 import { sessionToConvMap, convToSessionMap } from '../../lib/sessionMaps';
 import type { Session } from '@openz/shared';
 
@@ -62,20 +64,21 @@ function getSessionTitle(_session: Session, convId?: string): string {
 interface SessionItemProps {
   session: Session;
   isActive: boolean;
+  isPinned: boolean;
   onPress: (session: Session) => void;
-  onDelete: (sessionId: string) => void;
+  onLongPress: (session: Session) => void;
 }
 
-function SessionItem({ session, isActive, onPress, onDelete }: SessionItemProps) {
+function SessionItem({ session, isActive, isPinned, onPress, onLongPress }: SessionItemProps) {
   const { palette, tokens } = useTheme();
   const convId = sessionToConvMap.get(session.id);
   const title = getSessionTitle(session, convId);
-  const [showDel, setShowDel] = useState(false);
 
   return (
     <Pressable
       onPress={() => onPress(session)}
-      onLongPress={() => setShowDel((v) => !v)}
+      onLongPress={() => onLongPress(session)}
+      delayLongPress={600}
       style={({ pressed }) => [
         styles.sessionItem,
         isActive && { backgroundColor: palette.primarySoft },
@@ -83,9 +86,19 @@ function SessionItem({ session, isActive, onPress, onDelete }: SessionItemProps)
       ]}
       accessibilityRole="button"
       accessibilityLabel={`历史会话: ${title}`}
+      accessibilityHint="长按显示更多操作"
     >
-      <View style={styles.sessionIcon}>
-        <Icon name="history" size={16} color={isActive ? palette.primary : palette.fg3} />
+      <View
+        style={[
+          styles.sessionIcon,
+          isPinned && { backgroundColor: palette.primarySoft },
+        ]}
+      >
+        {isPinned ? (
+          <Icon name="starFilled" size={14} color={palette.primary} />
+        ) : (
+          <Icon name="history" size={16} color={isActive ? palette.primary : palette.fg3} />
+        )}
       </View>
       <View style={styles.sessionInfo}>
         <Text
@@ -101,19 +114,6 @@ function SessionItem({ session, isActive, onPress, onDelete }: SessionItemProps)
           {formatRelativeTime(session.createdAt)}
         </Text>
       </View>
-      {showDel && (
-        <Pressable
-          onPress={() => onDelete(session.id)}
-          style={({ pressed }) => [
-            styles.deleteBtn,
-            { backgroundColor: pressed ? '#FF3B30' : palette.surface },
-          ]}
-          hitSlop={8}
-          accessibilityLabel="删除会话"
-        >
-          <Icon name="trash" size={14} color={palette.danger} />
-        </Pressable>
-      )}
     </Pressable>
   );
 }
@@ -138,6 +138,21 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
   const updateMessage = useChatStore((s) => s.updateMessage);
   const conversations = useChatStore((s) => s.conversations);
 
+  // Local pinned sessions state
+  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(new Set());
+
+  // Action sheet state
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [actionSheetTitle, setActionSheetTitle] = useState('');
+  const [targetSession, setTargetSession] = useState<Session | null>(null);
+
+  // Rename modal state
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameInput, setRenameInput] = useState('');
+
+  // Rename local title state (for display after rename)
+  const [localTitles, setLocalTitles] = useState<Record<string, string>>({});
+
   // Animate
   useEffect(() => {
     Animated.parallel([
@@ -158,7 +173,6 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
     let convId = sessionToConvMap.get(session.id);
 
     if (!convId) {
-      // 创建新本地 conversation 并建立映射
       convId = createConversation();
       sessionToConvMap.set(session.id, convId);
       convToSessionMap.set(convId, session.id);
@@ -166,8 +180,6 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
 
     setActiveConversation(convId);
 
-    // 加载历史消息（如果本地还没有消息）
-    // 注意：必须从 store 直接读取，避免闭包捕获过时的 conversations 副本
     const currentConvs = useChatStore.getState().conversations;
     const conv = currentConvs[convId];
     if (!conv || conv.messages.length === 0) {
@@ -175,6 +187,52 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
     }
 
     onClose();
+  };
+
+  const handleSessionLongPress = (session: Session) => {
+    const convId = sessionToConvMap.get(session.id);
+    const title = localTitles[session.id] || getSessionTitle(session, convId);
+    setTargetSession(session);
+    setActionSheetTitle(title);
+    setActionSheetVisible(true);
+  };
+
+  const handleRename = () => {
+    if (!targetSession) return;
+    const convId = sessionToConvMap.get(targetSession.id);
+    const originalTitle = localTitles[targetSession.id] || getSessionTitle(targetSession, convId);
+    setRenameInput(originalTitle);
+    setRenameModalVisible(true);
+  };
+
+  const handleConfirmRename = (newTitle: string) => {
+    if (!targetSession) return;
+    setLocalTitles((prev) => ({ ...prev, [targetSession!.id]: newTitle }));
+    setTargetSession(null);
+  };
+
+  const handleTogglePin = () => {
+    if (!targetSession) return;
+    setPinnedSessionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(targetSession!.id)) {
+        next.delete(targetSession!.id);
+      } else {
+        next.add(targetSession!.id);
+      }
+      return next;
+    });
+    setTargetSession(null);
+  };
+
+  const handleDelete = () => {
+    if (!targetSession) return;
+    const convId = sessionToConvMap.get(targetSession.id);
+    sessionToConvMap.delete(targetSession.id);
+    if (convId) convToSessionMap.delete(convId);
+
+    deleteSessionMut.mutate(targetSession.id);
+    setTargetSession(null);
   };
 
   async function loadHistory(sessionId: string, convId: string) {
@@ -186,7 +244,6 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
       const data = await resp.json();
       const events: import('@openz/shared').AgentEvent[] = data.events ?? [];
 
-      // 解析事件，还原消息
       for (const ev of events) {
         if (ev.type === 'message_start') {
           const msgId = `hist-${ev.eventId}`;
@@ -202,7 +259,6 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
             isStreaming: false,
           });
         } else if (ev.type === 'text_delta') {
-          // 找到最后一条 ai 消息并追加
           const conv = useChatStore.getState().conversations[convId];
           if (conv) {
             const msgs = conv.messages;
@@ -213,9 +269,6 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
               });
             }
           }
-        } else if (ev.type === 'tool_result') {
-          // 可以选择展示 tool 结果，这里只打印
-          console.log('[HistoryDrawer] tool_result', ev.data.content);
         }
       }
     } catch (e) {
@@ -223,128 +276,230 @@ export function HistoryDrawer({ visible, onClose, onNewChat, onOpenSettings, tes
     }
   }
 
-  const handleDeleteSession = (sessionId: string) => {
-    const convId = sessionToConvMap.get(sessionId);
-    sessionToConvMap.delete(sessionId);
-    if (convId) convToSessionMap.delete(convId);
-
-    deleteSessionMut.mutate(sessionId);
-  };
-
+  // Sort sessions: pinned first, then by createdAt
   const sessions = sessionsQuery.data ?? [];
   const activeSessionId = activeConvId ? convToSessionMap.get(activeConvId) : null;
 
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      {/* Backdrop */}
-      <Animated.View
-        pointerEvents={visible ? 'auto' : 'none'}
-        style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: backdropOpacity }]}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="关闭" />
-      </Animated.View>
+  const sortedSessions = [...sessions].sort((a, b) => {
+    const aPinned = pinnedSessionIds.has(a.id) ? 1 : 0;
+    const bPinned = pinnedSessionIds.has(b.id) ? 1 : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+    return b.createdAt - a.createdAt;
+  });
 
-      {/* Drawer */}
-      <Animated.View
-        testID={testID}
-        style={[
-          styles.drawer,
-          { backgroundColor: palette.bg, shadowColor: '#000' },
-          { transform: [{ translateX }] },
-        ]}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Header / UserCard */}
-          <View style={[styles.userCard, { borderBottomColor: palette.border }]}>
-            <Avatar label="A" size={52} />
-            <View style={styles.userInfo}>
-              <Text style={[styles.userName, { color: palette.fg, fontSize: 17 }]}>Alex</Text>
-              <View style={[styles.proBadge, { backgroundColor: palette.primarySoft }]}>
-                <Text style={{ color: palette.primary, fontSize: 11, fontWeight: '600' }}>
-                  免费版 · 升级 Pro
-                </Text>
+  const isPinned = targetSession ? pinnedSessionIds.has(targetSession.id) : false;
+
+  const actionItems = [
+    {
+      icon: 'edit',
+      label: '重命名',
+      onPress: handleRename,
+    },
+    {
+      icon: isPinned ? 'starFilled' : 'star',
+      label: isPinned ? '取消置顶' : '置顶会话',
+      onPress: handleTogglePin,
+    },
+    {
+      icon: 'trash',
+      label: '删除',
+      danger: true,
+      onPress: handleDelete,
+    },
+  ];
+
+  return (
+    <>
+      <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+        {/* Backdrop */}
+        <Animated.View
+          pointerEvents={visible ? 'auto' : 'none'}
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: backdropOpacity }]}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="关闭" />
+        </Animated.View>
+
+        {/* Drawer */}
+        <Animated.View
+          testID={testID}
+          style={[
+            styles.drawer,
+            { backgroundColor: palette.bg, shadowColor: '#000' },
+            { transform: [{ translateX }] },
+          ]}
+        >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Header / UserCard */}
+            <View style={[styles.userCard, { borderBottomColor: palette.border }]}>
+              <Avatar label="A" size={52} />
+              <View style={styles.userInfo}>
+                <Text style={[styles.userName, { color: palette.fg, fontSize: 17 }]}>Alex</Text>
+                <View style={[styles.proBadge, { backgroundColor: palette.primarySoft }]}>
+                  <Text style={{ color: palette.primary, fontSize: 11, fontWeight: '600' }}>
+                    免费版 · 升级 Pro
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* 历史会话 Section */}
-          <View style={styles.section}>
-            {/* 新建对话按钮 */}
+            {/* 历史会话 Section */}
+            <View style={styles.section}>
+              {/* 新建对话按钮 */}
+              <Pressable
+                onPress={onNewChat}
+                style={({ pressed }) => [
+                  styles.newChatBtn,
+                  { backgroundColor: pressed ? palette.primarySoft : palette.primary },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="新建对话"
+              >
+                <Icon name="plus" size={16} color="#fff" />
+                <Text style={styles.newChatBtnText}>新建对话</Text>
+              </Pressable>
+
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: palette.fg3, fontSize: tokens.fontSize.xs, marginTop: 14 },
+                ]}
+              >
+                历史会话
+              </Text>
+
+              {sessionsQuery.isLoading ? (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color={palette.primary} />
+                  <Text style={{ color: palette.fg3, marginLeft: 8 }}>加载中…</Text>
+                </View>
+              ) : sessions.length === 0 ? (
+                <View style={styles.emptyRow}>
+                  <Text style={{ color: palette.fg3, fontSize: tokens.fontSize.sm }}>暂无历史会话</Text>
+                </View>
+              ) : (
+                <View style={styles.sessionList}>
+                  {sortedSessions.map((session) => (
+                    <SessionItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      isPinned={pinnedSessionIds.has(session.id)}
+                      onPress={handleSessionPress}
+                      onLongPress={handleSessionLongPress}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={[styles.footer, { borderTopColor: palette.border }]}>
             <Pressable
-              onPress={onNewChat}
+              onPress={onOpenSettings}
               style={({ pressed }) => [
-                styles.newChatBtn,
-                { backgroundColor: pressed ? palette.primarySoft : palette.primary },
+                styles.settingsBtn,
+                { backgroundColor: pressed ? palette.surface : 'transparent' },
               ]}
               accessibilityRole="button"
-              accessibilityLabel="新建对话"
+              accessibilityLabel="设置"
             >
-              <Icon name="plus" size={16} color="#fff" />
-              <Text style={styles.newChatBtnText}>新建对话</Text>
+              <Icon name="gear" size={18} color={palette.fg2} />
+              <Text style={[styles.settingsText, { color: palette.fg, fontSize: tokens.fontSize.md }]}>
+                设置
+              </Text>
             </Pressable>
-
-            <Text style={[styles.sectionTitle, { color: palette.fg3, fontSize: tokens.fontSize.xs, marginTop: 14 }]}>
-              历史会话
-            </Text>
-
-            {sessionsQuery.isLoading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator size="small" color={palette.primary} />
-                <Text style={{ color: palette.fg3, marginLeft: 8 }}>加载中…</Text>
-              </View>
-            ) : sessions.length === 0 ? (
-              <View style={styles.emptyRow}>
-                <Text style={{ color: palette.fg3, fontSize: tokens.fontSize.sm }}>暂无历史会话</Text>
-              </View>
-            ) : (
-              <View style={[styles.sessionList, { borderColor: palette.border }]}>
-                {sessions.map((session) => (
-                  <SessionItem
-                    key={session.id}
-                    session={session}
-                    isActive={session.id === activeSessionId}
-                    onPress={handleSessionPress}
-                    onDelete={handleDeleteSession}
-                  />
-                ))}
-              </View>
-            )}
+            <Pressable
+              onPress={() => {}}
+              style={({ pressed }) => [
+                styles.logoutBtn,
+                { backgroundColor: pressed ? palette.surface : 'transparent' },
+              ]}
+              accessibilityRole="button"
+            >
+              <Icon name="logout" size={18} color={palette.danger} />
+              <Text style={[styles.logoutText, { color: palette.danger, fontSize: tokens.fontSize.md }]}>
+                退出登录
+              </Text>
+            </Pressable>
           </View>
+        </Animated.View>
+      </Modal>
 
-        </ScrollView>
+      {/* Action Sheet */}
+      <ActionSheet
+        visible={actionSheetVisible}
+        title={actionSheetTitle}
+        items={actionItems}
+        onClose={() => {
+          setActionSheetVisible(false);
+          setTargetSession(null);
+        }}
+      />
 
-        {/* Footer */}
-        <View style={[styles.footer, { borderTopColor: palette.border }]}>
-          <Pressable
-            onPress={onOpenSettings}
-            style={({ pressed }) => [
-              styles.settingsBtn,
-              { backgroundColor: pressed ? palette.surface : 'transparent' },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="设置"
-          >
-            <Icon name="gear" size={18} color={palette.fg2} />
-            <Text style={[styles.settingsText, { color: palette.fg, fontSize: tokens.fontSize.md }]}>
-              设置
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {}}
-            style={({ pressed }) => [
-              styles.logoutBtn,
-              { backgroundColor: pressed ? palette.surface : 'transparent' },
-            ]}
-            accessibilityRole="button"
-          >
-            <Icon name="logout" size={18} color={palette.danger} />
-            <Text style={[styles.logoutText, { color: palette.danger, fontSize: tokens.fontSize.md }]}>
-              退出登录
-            </Text>
-          </Pressable>
+      {/* Rename Modal */}
+      <Modal
+        visible={renameModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenameModalVisible(false)}
+        statusBarTranslucent
+      >
+        <View style={renameStyles.overlay}>
+          <View style={[renameStyles.modalBox, { backgroundColor: palette.bg }]}>
+            <Text style={[renameStyles.modalTitle, { color: palette.fg }]}>重命名会话</Text>
+            <TextInput
+              value={renameInput}
+              onChangeText={setRenameInput}
+              style={[
+                renameStyles.modalInput,
+                {
+                  color: palette.fg,
+                  borderColor: palette.border,
+                  backgroundColor: palette.surface,
+                  fontSize: tokens.fontSize.md,
+                },
+              ]}
+              autoFocus
+              selectTextOnFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (renameInput.trim()) {
+                  handleConfirmRename(renameInput.trim());
+                }
+                setRenameModalVisible(false);
+              }}
+            />
+            <View style={renameStyles.modalActions}>
+              <Pressable
+                onPress={() => setRenameModalVisible(false)}
+                style={({ pressed }) => [
+                  renameStyles.modalBtn,
+                  { backgroundColor: pressed ? palette.surface2 : palette.surface },
+                ]}
+              >
+                <Text style={[renameStyles.cancelBtnText, { color: palette.fg }]}>取消</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (renameInput.trim()) {
+                    handleConfirmRename(renameInput.trim());
+                  }
+                  setRenameModalVisible(false);
+                }}
+                style={({ pressed }) => [
+                  renameStyles.modalBtn,
+                  renameStyles.confirmBtn,
+                  { backgroundColor: pressed ? palette.primary2 : palette.primary },
+                ]}
+              >
+                <Text style={renameStyles.confirmBtnText}>确定</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </Animated.View>
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -417,13 +572,6 @@ const styles = StyleSheet.create({
   },
   sessionInfo: { flex: 1 },
   sessionTitle: { fontWeight: '500', marginBottom: 2 },
-  deleteBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,27 +583,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: 'center',
   },
-  divider: { height: 1, marginBottom: 18 },
-  serverUrlBlock: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  serverUrlLabel: { fontSize: 12, fontWeight: '600' },
-  serverUrlInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-  },
-  saveBtn: {
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveBtnText: { color: '#fff', fontWeight: '600' },
-  serverUrlHint: { fontSize: 11 },
   footer: {
     borderTopWidth: 1,
     paddingHorizontal: 16,
@@ -484,4 +611,55 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   logoutText: { fontWeight: '500' },
+});
+
+const renameStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBox: {
+    width: 280,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 40,
+    elevation: 20,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  confirmBtn: {},
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  confirmBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

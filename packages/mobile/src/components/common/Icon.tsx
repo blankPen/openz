@@ -8,7 +8,7 @@ export type IconName =
   | 'help' | 'info' | 'sparkles' | 'bell' | 'gear' | 'logout' | 'textSize' | 'lang'
   | 'menu' | 'model' | 'search' | 'file' | 'star' | 'chart'
   | 'robot' | 'spark' | 'pptGrid' | 'chartEkg' | 'globe2'
-  | 'history' | 'trash';
+  | 'history' | 'trash' | 'edit' | 'starFilled';
 
 type Props = { name: IconName; size?: number; color: string; testID?: string; style?: object };
 
@@ -71,5 +71,9 @@ export function Icon({ name, size = 22, color, testID, style }: Props) {
     case 'history': return <Svg {...props}><Circle cx={12} cy={12} r={10} /><Polyline points="12 6 12 12 16 14" /></Svg>;
     // Trash icon for delete session
     case 'trash': return <Svg {...props}><Polyline points="3 6 5 6 21 6" /><Path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></Svg>;
+    // Edit / pencil icon for rename
+    case 'edit': return <Svg {...props}><Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><Path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></Svg>;
+    // Filled star for pinned sessions
+    case 'starFilled': return <Svg {...props} fill={color} stroke="none"><Polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></Svg>;
   }
 }
