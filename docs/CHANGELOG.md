@@ -37,3 +37,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Session persistence path updated to `~/.openz/sessions.json`
+
+## [0.3.0] - 2026-06-21
+
+### Added
+- **Mobile attachment feature**: Image/file selection, preview, upload, and download support
+  - `pickImage()`: Select images from photo library
+  - `takePhoto()`: Take photos with camera
+  - `pickDocument()`: Select local files
+  - `uploadAttachment()`: Upload attachments to daemon with progress callback
+
+### Changed
+- **CLI direct mode**: `daemon start` now defaults to direct mode (no relay) when `--server` flag is omitted
+- **Expo SDK alignment**: Updated `expo-document-picker`, `expo-file-system`, `expo-image-picker` to SDK 52 compatible versions
+
+### Fixed
+- Mobile Expo SDK compatibility issues resolved

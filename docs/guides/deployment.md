@@ -18,18 +18,14 @@ pnpm build
 ### 启动
 
 ```bash
-# 前台运行（直接模式）
+# 直接模式（默认，不连接 relay）
 node packages/cli/dist/index.js daemon
 
-# 后台运行（systemd）
-```
-
-### 中继模式
-
-```bash
 # 连接中继服务器
 node packages/cli/dist/index.js daemon --server ws://relay.example.com:8080
 ```
+
+> **注意**：`--server` 参数缺省时，daemon 以直接模式启动，不连接任何 relay。此时 Web 控制台需通过 `?server=` 参数指定 daemon 地址。
 
 ### 数据目录
 
