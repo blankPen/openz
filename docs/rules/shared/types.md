@@ -36,7 +36,49 @@ idle ──────► running ──────► done
    └────────────────► disconnected (daemon 重启后)
 ```
 
-## AgentEvent
+## AgentEventBase
+
+所有事件的公共字段：
+
+```typescript
+interface AgentEventBase {
+  eventId: string;      // UUID v4，全局唯一，去重用
+  sessionId: string;    // 会话 ID
+  seq: number;          // 会话内单调递增（从 0 起），检测丢事件
+  timestamp: number;    // Unix ms，事件产生时刻
+}
+```
+
+## AgentEvent 数据类型
+
+各事件 `data` 字段的强类型定义：
+
+```typescript
+interface SessionInitData {}                           // Session 初始化完成
+interface MessageStartData { messageId: string }      // 用户消息开始处理
+interface TextDeltaData { text: string }             // 文本增量输出
+interface ThinkingStartData {}                        // Claude 开始思考
+interface ThinkingDeltaData { text: string }          // 思考内容增量输出
+interface ToolUseStartData {                          // 开始调用工具
+  tool_use_id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+interface ToolUseInputDeltaData {                     // 工具输入参数增量（JSON 格式）
+  tool_use_id: string;
+  input_json_delta: string;
+}
+interface AssistantCompleteData { message: unknown }   // Assistant 消息块处理完成
+interface ToolResultData {                            // 工具执行结果
+  tool_use_id: string;
+  content: string;
+}
+interface TurnDoneData {}                             // 轮次结束
+interface RawStreamEventData { event: unknown }       // 原始 SDK 流事件（调试用）
+interface ErrorData { error: string }                 // 发生错误
+```
+
+## AgentEvent 完整类型
 
 Agent 运行时事件的联合类型，参见 [会话事件](../api/session-events.md)。
 
@@ -70,12 +112,13 @@ interface SessionRequest {
 }
 ```
 
-### SendVoiceReplyRequest
+### SessionHistoryQuery
+
+GET `/sessions/:id/events` 的查询参数：
 
 ```typescript
-interface SendVoiceReplyRequest {
-  sessionId: string;
-  message: string;
+interface SessionHistoryQuery {
+  after?: number; // 只拉 after 之后的 event（不含 after）
 }
 ```
 
@@ -112,6 +155,15 @@ interface SessionErrorResponse {
 interface SessionEventResponse {
   sessionId: string;
   event: AgentEvent;
+}
+```
+
+### SessionHistoryResponse
+
+```typescript
+interface SessionHistoryResponse {
+  sessionId: string;
+  events: AgentEvent[];
 }
 ```
 
