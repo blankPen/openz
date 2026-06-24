@@ -26,6 +26,7 @@ Socket.IO 支持两种调用方式：
 | `session:stop` | `SessionRequest` | 停止会话 |
 | `session:list` | - | 获取所有会话列表 |
 | `session:delete` | `SessionRequest` | 删除会话 |
+| `session:voice_reply` | `SendVoiceReplyRequest` | 发送语音回复请求（触发 TTS 合成） |
 
 ### 服务端 → 客户端
 
@@ -61,6 +62,15 @@ interface SendMessageRequest {
 ```typescript
 interface SessionRequest {
   sessionId: string;
+}
+```
+
+### SendVoiceReplyRequest
+
+```typescript
+interface SendVoiceReplyRequest {
+  sessionId: string;
+  message: string;   // 要进行语音回复的文本消息
 }
 ```
 

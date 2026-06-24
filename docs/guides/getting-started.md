@@ -27,6 +27,9 @@ pnpm dev
 
 # 或指定端口
 DAEMON_PORT=20000 pnpm dev
+
+# 连接中继服务器（公网部署模式）
+node packages/cli/dist/index.js daemon --server ws://relay.example.com:19998
 ```
 
 守护进程启动后：
