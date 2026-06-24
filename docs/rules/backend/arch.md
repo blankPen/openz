@@ -144,3 +144,37 @@ React 前端：
 - 会话元数据持久化：`~/.openz/sessions.json`
 - Daemon 状态持久化：`~/.openz/daemon.state.json`
 - 日志输出：`~/.openz/daemon.log`
+
+## Optimizer Agent
+
+`.agents/optimizer/` 是独立运行的自优化 Agent，不依赖 Daemon 进程。
+
+### 架构
+
+```
+.agents/optimizer/
+├── optimizer.js              # 主入口，CLI 可执行
+├── optimizer.js (runOptimizer)
+│     │
+│     ├─► collect_issues.js (fetchDailyIssueStats)
+│     │     └─► multica issue list --project <id>
+│     │
+│     ├─► detect_anomalies.js (detectAnomalies)
+│     │     ├─► detectTaskAllocationAnomalies()
+│     │     ├─► detectAutomationAnomalies()
+│     │     └─► detectCollaborationAnomalies()
+│     │
+│     └─► config_version.js (logConfigChange, postDailyReport)
+│           └─► multica issue comment add
+```
+
+### 执行方式
+
+```bash
+node .agents/optimizer/optimizer.js
+```
+
+### 输出
+
+- **日报**: 发布到 PZ-124 评论，包含问题发现和配置变更建议
+- **配置变更记录**: 高置信度异常自动记录到 PZ-124
